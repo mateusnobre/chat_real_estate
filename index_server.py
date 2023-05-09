@@ -79,11 +79,10 @@ def query_index(query_text):
 def insert_into_index(doc_file_path, doc_id=None):
     """Insert new document into global index."""
     global index, stored_docs
-    print(doc_file_path)
-    if doc_file_path.endswith(".html"):
-        document = BeautifulSoupWebReader(input_files=[doc_file_path]).load_data()[0]
-    else:
-        document = SimpleDirectoryReader(input_files=[doc_file_path]).load_data()[0]
+    # if doc_file_path.endswith(".html"):
+    #     document = BeautifulSoupWebReader(input_files=[doc_file_path]).load_data()[0]
+    # else:
+    document = SimpleDirectoryReader(input_files=[doc_file_path]).load_data()[0]
     if doc_id is not None:
         document.doc_id = doc_id
 
