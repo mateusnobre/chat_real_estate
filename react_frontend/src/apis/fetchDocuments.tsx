@@ -1,10 +1,12 @@
+import url from "./url";
+
 export type Document = {
   id: string;
   text: string;
 };
 
 const fetchDocuments = async (): Promise<Document[]> => {
-  const response = await fetch('http://localhost:5601/getDocuments', { mode: 'cors' });
+  const response = await fetch(`${url}/getDocuments`, { mode: 'cors' });
 
   if (!response.ok) {
     return [];

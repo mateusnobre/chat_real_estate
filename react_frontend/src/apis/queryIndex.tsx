@@ -1,3 +1,4 @@
+import url from './url';
 export type ResponseSources = {
   text: string;
   doc_id: string;
@@ -12,7 +13,7 @@ export type QueryResponse = {
 };
 
 const queryIndex = async (query: string): Promise<QueryResponse> => {
-  const queryURL = new URL('http://localhost:5601/query?');
+  const queryURL = new URL(`${url}/query?`);
   queryURL.searchParams.append('text', query);
 
   const response = await fetch(queryURL, { mode: 'cors' });
