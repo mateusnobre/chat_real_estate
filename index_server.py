@@ -111,7 +111,7 @@ def get_documents_list():
     return documents_list
 
 
-if __name__ == "__main__":
+def run_index_server():
     # init the global index
     print("initializing index...")
     initialize_index()
@@ -126,3 +126,7 @@ if __name__ == "__main__":
 
     print("server started...")
     server.serve_forever()
+
+
+if __name__ == "__main__":
+    run_index_server()

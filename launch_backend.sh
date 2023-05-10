@@ -8,7 +8,4 @@ echo "index_server running..."
 sleep 10
 
 # start the flask server
-python ./flask_server.py &
-
-# assumes you've ran npm install already (dockerfile does this during build)
-cd react_frontend && npm install && npm run build && serve -s build -l 3000
+python ./flask_server.py

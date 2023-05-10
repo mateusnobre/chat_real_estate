@@ -84,5 +84,9 @@ def home():
     return "Hello, World! Welcome to the llama_index docker image!"
 
 
-if __name__ == "__main__":
+def run_flask_server():
     app.run(host="0.0.0.0", port=5601)
+
+
+if __name__ == "__main__":
+    run_flask_server()
