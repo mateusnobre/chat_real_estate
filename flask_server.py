@@ -24,7 +24,7 @@ os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 llm_predictor = LLMPredictor(
     llm=OpenAI(
         temperature=0,
-        model_name="ada",
+        model_name="gpt-3.5-turbo",
         openai_api_key=os.environ["OPENAI_API_KEY"],
     )
 )
