@@ -5,6 +5,75 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+import pickle
+from langchain import OpenAI
+from multiprocessing import Lock
+from llama_index import (
+    LLMPredictor,
+    PromptHelper,
+    SimpleDirectoryReader,
+    BeautifulSoupWebReader,
+    GPTSimpleVectorIndex,
+    Document,
+    ServiceContext,
+)
+
+load_dotenv()
+
+# NOTE: for local testing only, do NOT deploy with your key hardcoded
+os.environ["ENV"] = os.getenv("ENV")
+os.environ["INDEX_PASSWORD"] = os.getenv("INDEX_PASSWORD")
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+
+
+index = None
+stored_docs = {}
+lock = Lock()
+
+index_name = "./index.json"
+pkl_name = "stored_documents.pkl"
+
+
+def initialize_index():
+    """Create a new global index, or load one from the pre-set path."""
+    global index, stored_docs
+    # define LLM
+    llm_predictor = LLMPredictor(
+        llm=OpenAI(
+            temperature=0,
+            model_name="ada",
+            openai_api_key=os.environ["OPENAI_API_KEY"],
+        )
+    )
+
+    # set maximum input size
+    max_input_size = 2049
+    # set number of output tokens
+    num_output = 500
+    # set maximum chunk overlap
+    max_chunk_overlap = 20
+    chunk_size_limit = 512
+
+    # define prompt helper
+    prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
+
+    service_context = ServiceContext.from_defaults(
+        llm_predictor=llm_predictor,
+        prompt_helper=prompt_helper,
+        chunk_size_limit=chunk_size_limit,
+    )
+    with lock:
+        if os.path.exists(index_name):
+            index = GPTSimpleVectorIndex.load_from_disk(
+                index_name, service_context=service_context
+            )
+        else:
+            index = GPTSimpleVectorIndex([], service_context=service_context)
+            index.save_to_disk(index_name)
+        if os.path.exists(pkl_name):
+            with open(pkl_name, "rb") as f:
+                stored_docs = pickle.load(f)
+
 
 app = Flask(__name__)
 CORS(app)
@@ -24,23 +93,20 @@ if os.getenv("ENV") == "dev":
 else:
     # initialize manager connection
     manager = BaseManager(
-        ("0.0.0.0", 5602),
+        os.environ["FLASK_HOST"],
         os.environ.get("INDEX_PASSWORD", "").encode("utf-8"),
     )
-manager.register("query_index")
-manager.register("insert_into_index")
-manager.register("get_documents_list")
-manager.connect()
 
 
 @app.route("/query", methods=["GET"])
 def query_index():
     global manager
+    global index
     query_text = request.args.get("text", None)
     if query_text is None:
         return "No text found, please include a ?text=blah parameter in the URL", 400
 
-    response = manager.query_index(query_text)._getvalue()
+    response = index.query(query_text)
     response_json = {
         "text": str(response),
         "sources": [
@@ -57,6 +123,31 @@ def query_index():
     return make_response(jsonify(response_json)), 200
 
 
+def insert_into_index(doc_file_path, doc_id=None):
+    """Insert new document into global index."""
+    global index, stored_docs
+    # if doc_file_path.endswith(".html"):
+    #     document = BeautifulSoupWebReader(input_files=[doc_file_path]).load_data()[0]
+    # else:
+    document = SimpleDirectoryReader(input_files=[doc_file_path]).load_data()[0]
+    if doc_id is not None:
+        document.doc_id = doc_id
+
+    with lock:
+        # Keep track of stored docs -- llama_index doesn't make this easy
+        stored_docs[document.doc_id] = document.text[
+            0:200
+        ]  # only take the first 200 chars
+
+        index.insert(document)
+        index.save_to_disk(index_name)
+
+        with open(pkl_name, "wb") as f:
+            pickle.dump(stored_docs, f)
+
+    return
+
+
 @app.route("/uploadFile", methods=["POST"])
 def upload_file():
     global manager
@@ -71,9 +162,9 @@ def upload_file():
         uploaded_file.save(filepath)
 
         if request.form.get("filename_as_doc_id", None) is not None:
-            manager.insert_into_index(filepath, doc_id=filename)
+            insert_into_index(filepath, doc_id=filename)
         else:
-            manager.insert_into_index(filepath)
+            insert_into_index(filepath)
     except Exception as e:
         # cleanup temp file
         traceback.print_exc()
@@ -90,9 +181,13 @@ def upload_file():
 
 @app.route("/getDocuments", methods=["GET"])
 def get_documents():
-    document_list = manager.get_documents_list()._getvalue()
+    global stored_doc
+    documents_list = []
+    for doc_id, doc_text in stored_docs.items():
+        documents_list.append({"id": doc_id, "text": doc_text})
+    documents_list = documents_list
 
-    return make_response(jsonify(document_list)), 200
+    return make_response(jsonify(documents_list)), 200
 
 
 @app.route("/")
@@ -101,6 +196,7 @@ def home():
 
 
 def run_flask_server():
+    initialize_index()
     if os.getenv("ENV") == "dev":
         app.run(
             host="0.0.0.0",
