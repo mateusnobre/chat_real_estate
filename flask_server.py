@@ -142,14 +142,16 @@ def upload_file():
 
 @app.route("/getDocuments", methods=["GET"])
 def get_documents():
-    with open(pkl_name, "rb") as f:
-        stored_docs = pickle.load(f)
-    documents_list = []
-    for doc_id, doc_text in stored_docs.items():
-        documents_list.append({"id": doc_id, "text": doc_text})
-    documents_list = documents_list
-
-    return make_response(jsonify(documents_list)), 200
+    if os.path.exists(pkl_name):
+        with open(pkl_name, "rb") as f:
+            stored_docs = pickle.load(f)
+        documents_list = []
+        for doc_id, doc_text in stored_docs.items():
+            documents_list.append({"id": doc_id, "text": doc_text})
+        documents_list = documents_list
+        return make_response(jsonify(documents_list)), 200
+    else:
+        return [], 200
 
 
 @app.route("/")
