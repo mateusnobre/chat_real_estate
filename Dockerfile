@@ -7,4 +7,4 @@ COPY . .
 RUN pip install -r requirements.txt && pip cache purge
 # Flask
 CMD ["sh", "launch_backend.sh"]
-EXPOSE 5601
+EXPOSE 8000
