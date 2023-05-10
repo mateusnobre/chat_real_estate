@@ -1,5 +1,5 @@
 #!/bin/bash
 
 # start backend index server
-python ./flask_server.py &
+gunicorn flask_server:app
 echo "flask_server running..."
