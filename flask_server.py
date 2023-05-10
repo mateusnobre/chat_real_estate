@@ -24,7 +24,7 @@ if os.getenv("ENV") == "dev":
 else:
     # initialize manager connection
     manager = BaseManager(
-        os.environ.get("FLASK_HOST", ""),
+        ("", 5602),
         os.environ.get("INDEX_PASSWORD", "").encode("utf-8"),
     )
 manager.register("query_index")
