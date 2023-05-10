@@ -12,15 +12,15 @@ CORS(app)
 load_dotenv()
 
 os.environ["INDEX_HOST"] = os.getenv("INDEX_HOST")
-os.environ["INDEX_PORT"] = int(os.getenv("INDEX_PORT"))
+os.environ["INDEX_PORT"] = os.getenv("INDEX_PORT")
 os.environ["INDEX_PASSWORD"] = os.getenv("INDEX_PASSWORD")
 os.environ["FLASK_HOST"] = os.getenv("FLASK_HOST")
-os.environ["FLASK_PORT"] = int(os.getenv("FLASK_PORT"))
+os.environ["FLASK_PORT"] = os.getenv("FLASK_PORT")
 
 
 # initialize manager connection
 manager = BaseManager(
-    (os.environ.get("INDEX_HOST", ""), os.environ.get("INDEX_PORT", "")),
+    (os.environ.get("INDEX_HOST", ""), int(os.environ.get("INDEX_PORT", ""))),
     os.environ.get("INDEX_PASSWORD", "").encode("utf-8"),
 )
 manager.register("query_index")
@@ -99,7 +99,7 @@ def home():
 def run_flask_server():
     app.run(
         host=os.environ.get("FLASK_HOST", "0.0.0.0"),
-        port=os.environ.get("FLASK_PORT", 5601),
+        port=int(os.environ.get("FLASK_PORT", 5601)),
     )
 
 
