@@ -1,3 +1,4 @@
+from time import sleep
 import os
 from multiprocessing.managers import BaseManager
 import traceback
@@ -150,7 +151,7 @@ def insert_into_index(doc_file_path, doc_id=None):
 
 @app.route("/uploadFile", methods=["POST"])
 def upload_file():
-    global manager
+    global manage
     if "file" not in request.files:
         return "Please send a POST request with a file", 400
 
@@ -197,6 +198,7 @@ def home():
 
 def run_flask_server():
     initialize_index()
+    sleep(60)
     if os.getenv("ENV") == "dev":
         app.run(
             host="0.0.0.0",
