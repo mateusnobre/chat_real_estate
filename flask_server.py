@@ -14,7 +14,6 @@ load_dotenv()
 os.environ["ENV"] = os.getenv("ENV")
 os.environ["INDEX_PASSWORD"] = os.getenv("INDEX_PASSWORD")
 os.environ["FLASK_HOST"] = os.getenv("FLASK_HOST")
-os.environ["FLASK_PORT"] = os.getenv("FLASK_PORT")
 
 if os.getenv("ENV") == "dev":
     # initialize manager connection
