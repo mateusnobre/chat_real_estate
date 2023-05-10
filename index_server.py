@@ -6,6 +6,11 @@ from langchain import OpenAI
 load_dotenv()
 
 # NOTE: for local testing only, do NOT deploy with your key hardcoded
+
+os.environ["INDEX_HOST"] = os.getenv("INDEX_HOST")
+os.environ["INDEX_PORT"] = os.getenv("INDEX_PORT")
+os.environ["INDEX_PASSWORD"] = os.getenv("INDEX_PASSWORD")
+
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
 from multiprocessing import Lock

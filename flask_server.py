@@ -11,17 +11,17 @@ CORS(app)
 
 load_dotenv()
 
-os.environ["MANAGER_HOST"] = os.getenv("MANAGER_HOST")
-os.environ["MANAGER_PORT"] = os.getenv("MANAGER_PORT")
-os.environ["MANAGER_PASSWORD"] = os.getenv("MANAGER_PASSWORD")
+os.environ["INDEX_HOST"] = os.getenv("INDEX_HOST")
+os.environ["INDEX_PORT"] = os.getenv("INDEX_PORT")
+os.environ["INDEX_PASSWORD"] = os.getenv("INDEX_PASSWORD")
 os.environ["FLASK_HOST"] = os.getenv("FLASK_HOST")
 os.environ["FLASK_PORT"] = os.getenv("FLASK_PORT")
 
 
 # initialize manager connection
 manager = BaseManager(
-    (os.environ.get("MANAGER_HOST", ""), os.environ.get("MANAGER_PORT", "")),
-    os.environ.get("MANAGER_PASSWORD", "").encode("utf-8"),
+    (os.environ.get("INDEX_HOST", ""), os.environ.get("INDEX_PORT", "")),
+    os.environ.get("INDEX_PASSWORD", "").encode("utf-8"),
 )
 manager.register("query_index")
 manager.register("insert_into_index")
