@@ -7,7 +7,6 @@ load_dotenv()
 
 # NOTE: for local testing only, do NOT deploy with your key hardcoded
 
-os.environ["INDEX_HOST"] = os.getenv("INDEX_HOST")
 os.environ["INDEX_PORT"] = os.getenv("INDEX_PORT")
 os.environ["INDEX_PASSWORD"] = os.getenv("INDEX_PASSWORD")
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
@@ -123,7 +122,7 @@ def run_index_server():
     # setup server
     # NOTE: you might want to handle the password in a less hardcoded way
     manager = BaseManager(
-        (os.environ.get("INDEX_HOST"), int(os.environ.get("INDEX_PORT"))),
+        (os.environ.get("INDEX_HOST", ""), int(os.environ.get("INDEX_PORT"))),
         os.environ.get("INDEX_PASSWORD").encode("utf-8"),
     )
     manager.register("query_index", query_index)
