@@ -1,6 +1,7 @@
 import os
 from multiprocessing.managers import BaseManager
 import traceback
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -8,9 +9,20 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 CORS(app)
 
+load_dotenv()
+
+os.environ["MANAGER_HOST"] = os.getenv("MANAGER_HOST")
+os.environ["MANAGER_PORT"] = os.getenv("MANAGER_PORT")
+os.environ["MANAGER_PASSWORD"] = os.getenv("MANAGER_PASSWORD")
+os.environ["FLASK_HOST"] = os.getenv("FLASK_HOST")
+os.environ["FLASK_PORT"] = os.getenv("FLASK_PORT")
+
+
 # initialize manager connection
-# NOTE: you might want to handle the password in a less hardcoded way
-manager = BaseManager(("", 5602), b"password")
+manager = BaseManager(
+    (os.environ.get("MANAGER_HOST", ""), os.environ.get("MANAGER_PORT", "")),
+    os.environ.get("MANAGER_PASSWORD", "").encode("utf-8"),
+)
 manager.register("query_index")
 manager.register("insert_into_index")
 manager.register("get_documents_list")
@@ -85,7 +97,10 @@ def home():
 
 
 def run_flask_server():
-    app.run(host="0.0.0.0", port=5601)
+    app.run(
+        host=os.environ.get("FLASK_HOST", "0.0.0.0"),
+        port=os.environ.get("FLASK_PORT", 5601),
+    )
 
 
 if __name__ == "__main__":
