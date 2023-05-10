@@ -11,17 +11,23 @@ CORS(app)
 
 load_dotenv()
 
-os.environ["INDEX_PORT"] = os.getenv("INDEX_PORT")
+os.environ["ENV"] = os.getenv("ENV")
 os.environ["INDEX_PASSWORD"] = os.getenv("INDEX_PASSWORD")
 os.environ["FLASK_HOST"] = os.getenv("FLASK_HOST")
 os.environ["FLASK_PORT"] = os.getenv("FLASK_PORT")
 
-
-# initialize manager connection
-manager = BaseManager(
-    (os.environ.get("INDEX_HOST", ""), int(os.environ.get("INDEX_PORT", ""))),
-    os.environ.get("INDEX_PASSWORD", "").encode("utf-8"),
-)
+if os.getenv("ENV") == "dev":
+    # initialize manager connection
+    manager = BaseManager(
+        ("", 5602),
+        os.environ.get("INDEX_PASSWORD", "").encode("utf-8"),
+    )
+else:
+    # initialize manager connection
+    manager = BaseManager(
+        os.environ.get("FLASK_HOST", ""),
+        os.environ.get("INDEX_PASSWORD", "").encode("utf-8"),
+    )
 manager.register("query_index")
 manager.register("insert_into_index")
 manager.register("get_documents_list")
@@ -96,10 +102,13 @@ def home():
 
 
 def run_flask_server():
-    app.run(
-        host=os.environ.get("FLASK_HOST", "0.0.0.0"),
-        port=int(os.environ.get("FLASK_PORT", 5601)),
-    )
+    if os.getenv("ENV") == "dev":
+        app.run(
+            host="0.0.0.0",
+            port=5601,
+        )
+    else:
+        app.run(host=os.environ.get("FLASK_HOST", ""))
 
 
 if __name__ == "__main__":

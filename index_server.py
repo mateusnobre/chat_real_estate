@@ -6,7 +6,7 @@ from langchain import OpenAI
 load_dotenv()
 
 # NOTE: for local testing only, do NOT deploy with your key hardcoded
-
+os.environ["ENV"] = os.getenv("ENV")
 os.environ["INDEX_PORT"] = os.getenv("INDEX_PORT")
 os.environ["INDEX_PASSWORD"] = os.getenv("INDEX_PASSWORD")
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
@@ -121,10 +121,16 @@ def run_index_server():
 
     # setup server
     # NOTE: you might want to handle the password in a less hardcoded way
-    manager = BaseManager(
-        (os.environ.get("INDEX_HOST", ""), int(os.environ.get("INDEX_PORT"))),
-        os.environ.get("INDEX_PASSWORD").encode("utf-8"),
-    )
+    if os.getenv("ENV") == "dev":
+        manager = BaseManager(
+            ("", 5602),
+            os.environ.get("INDEX_PASSWORD").encode("utf-8"),
+        )
+    else:
+        manager = BaseManager(
+            os.environ.get("FLASK_HOST", ""),
+            os.environ.get("INDEX_PASSWORD").encode("utf-8"),
+        )
     manager.register("query_index", query_index)
     manager.register("insert_into_index", insert_into_index)
     manager.register("get_documents_list", get_documents_list)
