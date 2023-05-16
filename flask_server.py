@@ -63,7 +63,6 @@ def query_index():
     )
     query_text = request.args.get("text", None)
     data_source = request.args.get("data_source", None)
-    print("Querying for: {}".format(data_source))
     if query_text is None:
         return "No text found, please include a ?text=blah parameter in the URL", 400
 
