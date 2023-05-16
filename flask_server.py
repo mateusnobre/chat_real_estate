@@ -3,9 +3,10 @@ import traceback
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
+import pandas as pd
 from werkzeug.utils import secure_filename
 import pickle
-from langchain import OpenAI
+from langchain.chat_models import ChatOpenAI
 from multiprocessing import Lock
 from llama_index import (
     LLMPredictor,
@@ -22,7 +23,7 @@ load_dotenv()
 os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
 llm_predictor = LLMPredictor(
-    llm=OpenAI(
+    llm=ChatOpenAI(
         temperature=0,
         model_name="gpt-3.5-turbo",
         openai_api_key=os.environ["OPENAI_API_KEY"],
@@ -61,6 +62,8 @@ def query_index():
         index_name, service_context=SERVICE_CONTEXT
     )
     query_text = request.args.get("text", None)
+    data_source = request.args.get("data_source", None)
+    print("Querying for: {}".format(data_source))
     if query_text is None:
         return "No text found, please include a ?text=blah parameter in the URL", 400
 
@@ -81,32 +84,47 @@ def query_index():
     return make_response(jsonify(response_json)), 200
 
 
-def insert_into_index(doc_file_path, doc_id=None):
+def insert_into_index(doc_file_path, kind="text", doc_id=None):
     """Insert new document into global index."""
     with open(pkl_name, "rb") as f:
         stored_docs = pickle.load(f)
     index = GPTSimpleVectorIndex.load_from_disk(
         index_name, service_context=SERVICE_CONTEXT
     )
-    # if doc_file_path.endswith(".html"):
-    #     document = BeautifulSoupWebReader(input_files=[doc_file_path]).load_data()[0]
-    # else:
-    document = SimpleDirectoryReader(input_files=[doc_file_path]).load_data()[0]
-    if doc_id is not None:
-        document.doc_id = doc_id
+    if kind == "text":
+        document = SimpleDirectoryReader(input_files=[doc_file_path]).load_data()[0]
+        if doc_id is not None:
+            document.doc_id = doc_id
+        with lock:
+            # Keep track of stored docs -- llama_index doesn't make this easy
+            stored_docs[document.doc_id] = document.text[
+                0:200
+            ]  # only take the first 200 chars
 
-    with lock:
-        # Keep track of stored docs -- llama_index doesn't make this easy
-        stored_docs[document.doc_id] = document.text[
-            0:200
-        ]  # only take the first 200 chars
+            index.insert(document)
+            index.save_to_disk(index_name)
 
-        index.insert(document)
-        index.save_to_disk(index_name)
+            with open(pkl_name, "wb") as f:
+                pickle.dump(stored_docs, f)
+    elif kind == "url":
+        reader = BeautifulSoupWebReader()
+        try:
+            document = reader.load_data(urls=[doc_file_path])[0]
+            if doc_id is not None:
+                document.doc_id = doc_id
+            with lock:
+                # Keep track of stored docs -- llama_index doesn't make this easy
+                stored_docs[document.doc_id] = document.text[
+                    0:200
+                ]  # only take the first 200 chars
 
-        with open(pkl_name, "wb") as f:
-            pickle.dump(stored_docs, f)
+                index.insert(document)
+                index.save_to_disk(index_name)
 
+                with open(pkl_name, "wb") as f:
+                    pickle.dump(stored_docs, f)
+        except:
+            print("Error loading URL: {}".format(doc_file_path))
     return
 
 
@@ -121,11 +139,20 @@ def upload_file():
         filename = secure_filename(uploaded_file.filename)
         filepath = os.path.join("documents", os.path.basename(filename))
         uploaded_file.save(filepath)
+        if filename.endswith(".xlsx") or filename.endswith(".xls"):
+            urls = pd.read_excel(filepath, header=None, names=["URL"])
+            for url in urls["URL"]:
+                insert_into_index(url, kind="url", doc_id=url)
+        elif filename.endswith(".csv") or filename.endswith(".tsv"):
+            urls = pd.read_csv(filepath, header=None, names=["URL"])
+            for url in urls["URL"]:
+                insert_into_index(url, kind="url", doc_id=url)
 
-        if request.form.get("filename_as_doc_id", None) is not None:
-            insert_into_index(filepath, doc_id=filename)
         else:
-            insert_into_index(filepath)
+            if request.form.get("filename_as_doc_id", None) is not None:
+                insert_into_index(filepath, doc_id=filename)
+            else:
+                insert_into_index(filepath)
     except Exception as e:
         # cleanup temp file
         traceback.print_exc()
@@ -138,6 +165,25 @@ def upload_file():
         os.remove(filepath)
 
     return "File inserted!", 200
+
+
+@app.route("/uploadURL", methods=["POST"])
+def upload_url():
+    # verify if a url is valid
+    print(request)
+    if "url" not in request.files:
+        return "Please send a POST request with a valid URL", 400
+    try:
+        url = request.files["url"]
+        if request.form.get("filename_as_doc_id", None) is not None:
+            insert_into_index(url, kind="url", doc_id=url)
+        else:
+            insert_into_index(url, kind="url")
+    except Exception as e:
+        traceback.print_exc()
+        return "Error: {}".format(str(e)), 500
+
+    return "URL inserted!", 200
 
 
 @app.route("/getDocuments", methods=["GET"])
@@ -157,3 +203,7 @@ def get_documents():
 @app.route("/")
 def home():
     return "Hello, World! Welcome to the llama_index docker image!"
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=8000)

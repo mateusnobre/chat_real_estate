@@ -12,9 +12,11 @@ export type QueryResponse = {
   sources: ResponseSources[];
 };
 
-const queryIndex = async (query: string): Promise<QueryResponse> => {
+const queryIndex = async (query: string, data_source: string): Promise<QueryResponse> => {
   const queryURL = new URL(`${url}/query?`);
   queryURL.searchParams.append('text', query);
+  queryURL.searchParams.append('data_source', data_source);
+
 
   const response = await fetch(queryURL, { mode: 'cors' });
   if (!response.ok) {

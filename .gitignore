@@ -162,3 +162,5 @@ cython_debug/
 index.json
 
 *.pkl
+
+.vscode/

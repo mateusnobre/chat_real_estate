@@ -106,7 +106,7 @@ const IndexQuery = () => {
   const handleQuery = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key == 'Enter') {
       setLoading(true);
-      queryIndex(e.currentTarget.value).then((response) => {
+      queryIndex(e.currentTarget.value, "texts").then((response) => {
         setLoading(false);
         setResponseText(response.text);
         setResponseSources(response.sources);
