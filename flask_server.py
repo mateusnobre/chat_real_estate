@@ -1,3 +1,5 @@
+from functools import wraps
+import json
 import os
 import traceback
 from dotenv import load_dotenv
@@ -6,132 +8,85 @@ from flask_cors import CORS
 import pandas as pd
 from werkzeug.utils import secure_filename
 import pickle
-from langchain.chat_models import ChatOpenAI
-from multiprocessing import Lock
-from llama_index import (
-    LLMPredictor,
-    PromptHelper,
-    SimpleDirectoryReader,
-    BeautifulSoupWebReader,
-    GPTSimpleVectorIndex,
-    Document,
-    ServiceContext,
-)
+from llama_index import GPTSimpleVectorIndex
+from google.oauth2 import service_account
+from utils import SERVICE_CONTEXT, insert_into_index, answer_question
 
-load_dotenv()
-
-os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
-
-llm_predictor = LLMPredictor(
-    llm=ChatOpenAI(
-        temperature=0,
-        model_name="gpt-3.5-turbo",
-        openai_api_key=os.environ["OPENAI_API_KEY"],
-    )
-)
-
-# set maximum input size
-max_input_size = 2049
-# set number of output tokens
-num_output = 500
-# set maximum chunk overlap
-max_chunk_overlap = 20
-chunk_size_limit = 512
-
-# define prompt helper
-prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
-
-SERVICE_CONTEXT = ServiceContext.from_defaults(
-    llm_predictor=llm_predictor,
-    prompt_helper=prompt_helper,
-    chunk_size_limit=chunk_size_limit,
-)
 
 stored_docs = {}
-lock = Lock()
-index_name = "./index.json"
-pkl_name = "stored_documents.pkl"
 
 app = Flask(__name__)
 CORS(app)
+API_PASSWORD = os.getenv("API_PASSWORD")
+INDEX_NAME = os.getenv("INDEX_NAME")
+PKL_NAME = os.getenv("PKL_NAME")
+CREDENTIALS = service_account.Credentials.from_service_account_file("creds.json")
+
+
+def authenticate(func):
+    @wraps(func)
+    def decorated(*args, **kwargs):
+        # Perform authentication logic here
+        # For example, check if the request contains a valid access token
+        access_token = request.headers.get("Authorization")
+        if not access_token:
+            return jsonify({"error": "Unauthorized access."}), 401
+        if access_token != API_PASSWORD:
+            return jsonify({"error": "Invalid access token."}), 401
+        # Here, you can validate the access token against your authentication system
+
+        # For simplicity, we assume authentication is successful and set the user in the 'g' context object
+        # g.user = {'id': 123, 'email': 'user@example.com'}
+        return func(*args, **kwargs)
+
+    return decorated
 
 
 @app.route("/query", methods=["GET"])
+@authenticate
 def query_index():
     index = GPTSimpleVectorIndex.load_from_disk(
-        index_name, service_context=SERVICE_CONTEXT
+        INDEX_NAME, service_context=SERVICE_CONTEXT
     )
     query_text = request.args.get("text", None)
     data_source = request.args.get("data_source", None)
     if query_text is None:
         return "No text found, please include a ?text=blah parameter in the URL", 400
-
-    response = index.query(query_text)
-    response_json = {
-        "text": str(response),
-        "sources": [
-            {
-                "text": str(x.source_text),
-                "similarity": round(x.similarity, 2),
-                "doc_id": str(x.doc_id),
-                "start": x.node_info["start"],
-                "end": x.node_info["end"],
-            }
-            for x in response.source_nodes
-        ],
-    }
+    if data_source == "Documents":
+        response = index.query(query_text)
+        response_json = {
+            "text": str(response),
+            "sources": [
+                {
+                    "text": str(x.source_text),
+                    "similarity": round(x.similarity, 2),
+                    "doc_id": str(x.doc_id),
+                    "start": x.node_info["start"],
+                    "end": x.node_info["end"],
+                }
+                for x in response.source_nodes
+            ],
+        }
+    elif data_source == "BigQuery":
+        response = answer_question(query_text, CREDENTIALS)
+        response_json = {
+            "text": response["answer"],
+            "summary": response["summary"],
+            "sql_query": response["sql_query"],
+        }
+    else:
+        return (
+            "No data source found, please include a ?data_source=Documents or ?data_source=BigQuery parameter in the URL",
+            400,
+        )
     return make_response(jsonify(response_json)), 200
 
 
-def insert_into_index(doc_file_path, kind="text", doc_id=None):
-    """Insert new document into global index."""
-    with open(pkl_name, "rb") as f:
-        stored_docs = pickle.load(f)
-    index = GPTSimpleVectorIndex.load_from_disk(
-        index_name, service_context=SERVICE_CONTEXT
-    )
-    if kind == "text":
-        document = SimpleDirectoryReader(input_files=[doc_file_path]).load_data()[0]
-        if doc_id is not None:
-            document.doc_id = doc_id
-        with lock:
-            # Keep track of stored docs -- llama_index doesn't make this easy
-            stored_docs[document.doc_id] = document.text[
-                0:200
-            ]  # only take the first 200 chars
-
-            index.insert(document)
-            index.save_to_disk(index_name)
-
-            with open(pkl_name, "wb") as f:
-                pickle.dump(stored_docs, f)
-    elif kind == "url":
-        reader = BeautifulSoupWebReader()
-        try:
-            document = reader.load_data(urls=[doc_file_path])[0]
-            if doc_id is not None:
-                document.doc_id = doc_id
-            with lock:
-                # Keep track of stored docs -- llama_index doesn't make this easy
-                stored_docs[document.doc_id] = document.text[
-                    0:200
-                ]  # only take the first 200 chars
-
-                index.insert(document)
-                index.save_to_disk(index_name)
-
-                with open(pkl_name, "wb") as f:
-                    pickle.dump(stored_docs, f)
-        except:
-            print("Error loading URL: {}".format(doc_file_path))
-    return
-
-
 @app.route("/uploadFile", methods=["POST"])
+@authenticate
 def upload_file():
     if "file" not in request.files:
         return "Please send a POST request with a file", 400
-
     filepath = None
     try:
         uploaded_file = request.files["file"]
@@ -166,29 +121,11 @@ def upload_file():
     return "File inserted!", 200
 
 
-@app.route("/uploadURL", methods=["POST"])
-def upload_url():
-    # verify if a url is valid
-    print(request)
-    if "url" not in request.files:
-        return "Please send a POST request with a valid URL", 400
-    try:
-        url = request.files["url"]
-        if request.form.get("filename_as_doc_id", None) is not None:
-            insert_into_index(url, kind="url", doc_id=url)
-        else:
-            insert_into_index(url, kind="url")
-    except Exception as e:
-        traceback.print_exc()
-        return "Error: {}".format(str(e)), 500
-
-    return "URL inserted!", 200
-
-
 @app.route("/getDocuments", methods=["GET"])
+@authenticate
 def get_documents():
-    if os.path.exists(pkl_name):
-        with open(pkl_name, "rb") as f:
+    if os.path.exists(PKL_NAME):
+        with open(PKL_NAME, "rb") as f:
             stored_docs = pickle.load(f)
         documents_list = []
         for doc_id, doc_text in stored_docs.items():
@@ -200,8 +137,9 @@ def get_documents():
 
 
 @app.route("/")
+@authenticate
 def home():
-    return "Hello, World! Welcome to the llama_index docker image!"
+    return "Hello, World!"
 
 
 if __name__ == "__main__":

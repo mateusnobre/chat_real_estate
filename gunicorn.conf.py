@@ -1,61 +1,57 @@
+import json
 from multiprocessing import Lock
 import os
 import pickle
 from dotenv import load_dotenv
-from langchain import OpenAI
-
-from llama_index import GPTSimpleVectorIndex, LLMPredictor, PromptHelper, ServiceContext
-
+from google.cloud import storage
+from llama_index import GPTSimpleVectorIndex
+from utils import SERVICE_CONTEXT
 
 index = None
 stored_docs = {}
 lock = Lock()
-
-index_name = "./index.json"
-pkl_name = "stored_documents.pkl"
-
 load_dotenv()
 
-os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+INDEX_NAME = os.getenv("INDEX_NAME")
+PKL_NAME = os.getenv("PKL_NAME")
+
+CREDENTIALS_JSON = {
+    "type": "service_account",
+    "project_id": os.getenv("GCLOUD_PROJECT_ID"),
+    "private_key_id": os.getenv("GCLOUD_PRIVATE_KEY_ID"),
+    "private_key": os.getenv("GCLOUD_PRIVATE_KEY").replace("\\n", "\n"),
+    "client_email": os.getenv("GCLOUD_CLIENT_EMAIL"),
+    "client_id": os.getenv("GCLOUD_CLIENT_ID"),
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": os.getenv("GCLOUD_CLIENT_X509_CERT_URL"),
+    "universe_domain": "googleapis.com",
+}
+with open("creds.json", "w") as creds_file:
+    creds_file.write(json.dumps(CREDENTIALS_JSON))
+
+client = storage.Client.from_service_account_json(json_credentials_path="creds.json")
+
+bucket = storage.Bucket(client, "topic-indexes")
+index_blob = bucket.blob(INDEX_NAME)
+stored_docs_blob = bucket.blob(PKL_NAME)
 
 
-"""Create a new global index, or load one from the pre-set path."""
-# define LLM
-llm_predictor = LLMPredictor(
-    llm=OpenAI(
-        temperature=0,
-        model_name="ada",
-        openai_api_key=os.environ["OPENAI_API_KEY"],
-    )
-)
-
-# set maximum input size
-max_input_size = 2049
-# set number of output tokens
-num_output = 500
-# set maximum chunk overlap
-max_chunk_overlap = 20
-chunk_size_limit = 512
-
-# define prompt helper
-prompt_helper = PromptHelper(max_input_size, num_output, max_chunk_overlap)
-
-service_context = ServiceContext.from_defaults(
-    llm_predictor=llm_predictor,
-    prompt_helper=prompt_helper,
-    chunk_size_limit=chunk_size_limit,
-)
 with lock:
-    if os.path.exists(index_name):
-        index = GPTSimpleVectorIndex.load_from_disk(
-            index_name, service_context=service_context
-        )
+    if index_blob.exists():
+        # download index blob
+        index_blob.download_to_filename(INDEX_NAME)
     else:
-        index = GPTSimpleVectorIndex([], service_context=service_context)
-        index.save_to_disk(index_name)
-    if os.path.exists(pkl_name):
-        with open(pkl_name, "rb") as f:
-            stored_docs = pickle.load(f)
+        # create index.json in bucket
+        index = GPTSimpleVectorIndex([], service_context=SERVICE_CONTEXT)
+        index.save_to_disk(INDEX_NAME)
+        index_blob.upload_from_filename(INDEX_NAME)
+    if stored_docs_blob.exists():
+        # download stored_docs blob
+        stored_docs_blob.download_to_filename(PKL_NAME)
     else:
-        with open(pkl_name, "wb") as f:
+        # create stored_documents.pkl in bucket
+        with open(PKL_NAME, "wb") as f:
             pickle.dump({}, f)
+        stored_docs_blob.upload_from_filename(PKL_NAME)

@@ -4,7 +4,7 @@ const AppHeader = styled.header`
   display: flex;
   flex-direction: row;
   height: 250px;
-  width: 900px;
+  width: 80%;
 `
 const AppHeaderMain = styled.div`
     display: flex;

@@ -2,7 +2,7 @@ import React from 'react';
 import { useEffect, useState } from 'react';
 import DocumentUploader from './DocumentUploader';
 import DocumentViewer from './DocumentViewer';
-import fetchDocuments, { Document } from '../apis/fetchDocuments';
+import Api from '../apis/api';
 import styled from 'styled-components';
 
 const DocumentToolsDiv = styled.div`
@@ -27,22 +27,51 @@ const URLUploader = styled.div`
   font-size: 1.2rem;
   `
 
+
+type Document = {
+  id: string;
+  text: string;
+};
+
+
 const DocumentTools = () => {
   const [refreshViewer, setRefreshViewer] = useState(false);
   const [documentList, setDocumentList] = useState<Document[]>([]);
 
   // Get the list on first load
   useEffect(() => {
-    fetchDocuments().then((documents) => {
-      setDocumentList(documents);
+    Api('GET', "getDocuments").then((documents) => {
+      if (!documents) {
+        return;
+      }
+      const documentList = documents.data.map(
+        (element: Document) => (
+          {
+            id: element.id,
+            text: element.text,
+          }
+        )
+      )
+      setDocumentList(documentList);
     });
   }, []);
 
   useEffect(() => {
     if (refreshViewer) {
       setRefreshViewer(false);
-      fetchDocuments().then((documents) => {
-        setDocumentList(documents);
+      Api('GET', "getDocuments").then((documents) => {
+        if (!documents) {
+          return;
+        }
+        const documentList = documents.data.map(
+          (element: Document) => (
+            {
+              id: element.id,
+              text: element.text,
+            }
+          )
+        )
+        setDocumentList(documentList);
       });
     }
   }, [refreshViewer]);

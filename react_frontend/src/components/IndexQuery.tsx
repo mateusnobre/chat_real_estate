@@ -2,15 +2,26 @@ import React from 'react';
 import { useState } from 'react';
 import { CircleLoader } from 'react-spinners';
 import classNames from 'classnames';
-import queryIndex, { ResponseSources } from '../apis/queryIndex';
 import styled from 'styled-components';
+import Api from '../apis/api';
+
+export type ResponseSources = {
+  text: string;
+  doc_id: string;
+  start: number;
+  end: number;
+  similarity: number;
+};
+
+export type QueryResponse = {
+  text: string;
+  sources: ResponseSources[];
+};
 
 const IndexQueryDiv = styled.div`
 display: flex;
 flex-direction: column;
 width: 50%;
-gap: 15px;
-
 `
 const IndexQueryInputDiv = styled.div`
   display: flex;
@@ -36,8 +47,7 @@ const ResultsDiv = styled.div`
   background-color: ${props => props.theme.primary};
   border-radius: 5px;
   font-size: 12px;
-  padding: 5px;
-  height: 20vh;
+  height: 30vh;
   overflow-x: scroll;
 
   &--loading {
@@ -51,8 +61,7 @@ const SourcesDiv = styled.div`
   border-radius: 5px;
   display: flex;
   flex-direction: column;
-  height: calc(26.3vh - 22px);
-  padding: 5px;
+  height: calc(30vh - 22px);
   text-align: left;
   overflow-x: scroll;
 
@@ -95,6 +104,11 @@ width: 100%;
 }
 
 `
+const SQLSource = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items:center;
+`
 
 
 
@@ -102,14 +116,32 @@ const IndexQuery = () => {
   const [isLoading, setLoading] = useState(false);
   const [responseText, setResponseText] = useState('');
   const [responseSources, setResponseSources] = useState<ResponseSources[]>([]);
+  const [SQLQuery, setSQLQuery] = useState('' as string);
+  const [resultSQLQuery, setResultSQLQuery] = useState('' as string);
+  const [data_source, setDataSource] = React.useState('Documents');
+
+  const handleDataSourceChange = (data_source: string) => {
+    setDataSource(data_source);
+  }
 
   const handleQuery = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key == 'Enter') {
       setLoading(true);
-      queryIndex(e.currentTarget.value, "texts").then((response) => {
+      Api("GET", "query", null, { text: e.currentTarget.value, data_source: data_source }).then((response) => {
         setLoading(false);
-        setResponseText(response.text);
-        setResponseSources(response.sources);
+        if (!response) {
+          return;
+        }
+        const data = response.data;
+        if (data_source === 'BigQuery') {
+          setResponseText(data.summary);
+          setSQLQuery(data.sql_query);
+          setResultSQLQuery(data.text);
+        }
+        else if (data_source === 'Documents') {
+          setResponseText(data.text);
+          setResponseSources(data.sources);
+        }
       });
     }
   };
@@ -138,6 +170,10 @@ const IndexQuery = () => {
     <IndexQueryDiv>
       <IndexQueryInputDiv>
         <label htmlFor='query-text'>Ask a question!</label>
+        <select name="data_source" value={data_source} onChange={event => handleDataSourceChange(event.target.value)}>
+          <option id="0" >Documents</option>
+          <option id="1" >BigQuery</option>
+        </select>
         <input
           type='text'
           name='query-text'
@@ -160,7 +196,7 @@ const IndexQuery = () => {
         })}
       >
         <SourcesItem>
-          <p className='id'>Query Response</p>
+          <h2 className='id'>Query Response</h2>
         </SourcesItem>
         {responseText}
       </ResultsDiv>
@@ -170,9 +206,9 @@ const IndexQuery = () => {
         })}
       >
         <SourcesItem>
-          <p className='id'>Response Sources</p>
+          <h3 className='id'>Response Sources</h3>
         </SourcesItem>
-        {sourceElems}
+        {data_source === 'Documents' ? sourceElems : <SQLSource><h3>SQL Query</h3><p>{SQLQuery}</p><h4>SQL Query Result</h4><p>{resultSQLQuery}</p></SQLSource>}
       </SourcesDiv>
     </IndexQueryDiv>
   );

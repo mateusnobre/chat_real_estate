@@ -1,5 +1,4 @@
 import React from 'react';
-import type { Document } from '../apis/fetchDocuments';
 import styled from 'styled-components';
 
 const DocumentViewerDiv = styled.div`
@@ -52,6 +51,11 @@ margin: 0;
 padding: 3px 0px;
 
 `
+
+type Document = {
+  id: string;
+  text: string;
+};
 
 const MAX_TITLE_LENGTH = 32;
 const MAX_DOC_LENGTH = 150;

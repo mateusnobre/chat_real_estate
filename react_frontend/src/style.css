@@ -16,7 +16,7 @@
   display: flex;
   flex-direction: row;
   gap: 50px;
-  width: 900px;
+  width: 80%;
 }
 
 body {

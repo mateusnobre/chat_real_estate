@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChangeEvent, useState } from 'react';
 import { CircleLoader } from 'react-spinners';
-import insertDocument from '../apis/insertDocument';
+import Api from '../apis/api';
 import styled from 'styled-components';
 
 const Uploader = styled.div`
@@ -63,7 +63,6 @@ p {
   font-size: 15px;
   padding: 5px;
   width: 100%;
-  width: 450px;
 }
 `
 
@@ -112,12 +111,16 @@ const DocumentUploader = ({ setRefreshViewer }: DocumentUploaderProps) => {
   const handleSubmission = () => {
     if (selectedFile) {
       setIsLoading(true);
-      insertDocument(selectedFile).then(() => {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('filename_as_doc_id', 'true');
+      Api('POST', "uploadFile", formData).then(() => {
         setRefreshViewer(true);
         setSelectedFile(undefined);
         setIsFilePicked(false);
         setIsLoading(false);
       });
+
     }
   };
 
