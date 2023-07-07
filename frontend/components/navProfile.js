@@ -27,11 +27,6 @@ const NavProfile = ({ isAuthenticated, userProfile }) => {
           </Link>
         </li>
         <li className="nav-item">
-          <Link href="/profile">
-            <a className="dropdown-item">Your Profile</a>
-          </Link>
-        </li>
-        <li className="nav-item">
           <Link href="/my_indexes">
             <a className="dropdown-item">My Agents</a>
           </Link>
