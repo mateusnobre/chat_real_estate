@@ -159,9 +159,18 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-index.json
-creds.json
-*index.json
-*.pkl
 
 .vscode/
+creds.json
+
+*.crt
+
+*.pkl
+
+*temp_path*
+
+*/dev_index*
+
+*.txt
+
+/poetry.lock
