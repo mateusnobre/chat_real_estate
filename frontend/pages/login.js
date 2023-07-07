@@ -1,6 +1,5 @@
 import React from 'react';
 import Layout from '../components/layout';
-import SaltoBanner from '../components/saltoBanner';
 import LoginComponent from '../components/loginForm';
 import { authCheck } from '../utils/auth';
 
@@ -18,8 +17,6 @@ const LoginPage = () => {
             <LoginComponent />
           </div>
         </div>
-
-        <SaltoBanner />
       </div>
       <style jsx>{`
           .login-page {

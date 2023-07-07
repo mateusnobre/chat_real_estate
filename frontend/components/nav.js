@@ -26,7 +26,7 @@ class Nav extends React.Component {
             <li className="navitem d-flex">
               <Link href="/">
                 <a className="navbar-brand">
-                  <img className="logo" src={logoSrc} />
+                  Chat Real Estate
                 </a>
               </Link>
             </li>

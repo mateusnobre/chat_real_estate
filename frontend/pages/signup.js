@@ -1,7 +1,6 @@
 import React from 'react';
 import Layout from '../components/layout';
 import SignupForm from '../components/signupForm';
-import SaltoBanner from '../components/saltoBanner';
 import { authCheck } from '../utils/auth';
 
 
@@ -19,7 +18,6 @@ const Signup = () => {
 
           <SignupForm />
         </div>
-        <SaltoBanner />
       </div>
       <style jsx>{`
           .page-signup {
