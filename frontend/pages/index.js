@@ -19,7 +19,7 @@ const Home = () => {
       <div className="home">
         <div className="container">
           <div className="text">
-            <h1>Create your own personal AI Assistant. Take a leap in productivity!</h1>
+            <h1>Personal AI Assistant based on Real Estate Data</h1>
             <h2>
               PDFs, epub, Word Files, Youtube URLs with Captions, Web Pages, and many more accepted file types.
             </h2>

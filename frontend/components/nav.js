@@ -25,7 +25,7 @@ class Nav extends React.Component {
           <ul className="navbar-nav mr-auto">
             <li className="navitem d-flex">
               <Link href="/">
-                <a className="navbar-brand">
+                <a style={{ "fontWeight": 700, color: "lightblue" }} className="navbar-brand">
                   Chat Real Estate
                 </a>
               </Link>
