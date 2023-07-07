@@ -59,7 +59,7 @@ const useApiClient = () => {
   };
 
   const getBaseUrl = () => {
-    const BASE_URL = process.env.NODE_ENV === 'production' ? 'https://salto-gpt-backend.onrender.com' : 'http://127.0.0.1:8000';
+    const BASE_URL = process.env.NODE_ENV === 'production' ? 'https://chat-real-estate-backend.onrender.com' : 'http://127.0.0.1:8000';
     return BASE_URL
   };
 
