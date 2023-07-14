@@ -66,10 +66,10 @@ const NavProfile: React.FC<NavProfileProps> = ({ isAuthenticated, userProfile, i
       items = (
         <Items isSplashPage={isSplashPage}>
           <Link href="/login">
-            <div style={{ height: '33px', width: '130px', alignContent: "center", borderRadius: "10px", textAlign: 'center', fontSize: "15px", border: "2px solid white", marginRight: "5px", backgroundColor: 'transparent', color: 'white' }}>Sign In</div>
+            <div style={{ userSelect: "none", cursor: "pointer", touchAction: "manipulation", height: '33px', width: '130px', alignContent: "center", borderRadius: "10px", textAlign: 'center', fontSize: "15px", border: "2px solid white", marginRight: "5px", backgroundColor: 'transparent', color: 'white' }}>Sign In</div>
           </Link>
           <Link href="/signup">
-            <div style={{ height: '33px', width: '130px', alignContent: "center", borderRadius: "10px", textAlign: 'center', fontSize: "15px", backgroundColor: '#fff', marginLeft: "5px", color: '#000' }}>Create Account</div>
+            <div style={{ userSelect: "none", cursor: "pointer", touchAction: "manipulation", height: '33px', width: '130px', alignContent: "center", borderRadius: "10px", textAlign: 'center', fontSize: "15px", backgroundColor: '#fff', marginLeft: "5px", color: '#000' }}>Create Account</div>
 
           </Link>
 

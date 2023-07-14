@@ -78,11 +78,11 @@ const Home: React.FC = () => {
           </> :
           <>
             <Link href="/login">
-              <Button css={{ textAlign: 'center', fontSize: "15px", border: "2px solid white", height: '30px', width: '20px', backgroundColor: 'transparent', color: 'white' }}>Sign In</Button>
+              <div style={{ userSelect: "none", cursor: "pointer", touchAction: "manipulation", height: '33px', width: '130px', alignContent: "center", borderRadius: "10px", textAlign: 'center', fontSize: "15px", border: "2px solid white", backgroundColor: 'transparent', color: 'white' }}>Sign In</div>
             </Link>
             <Spacer y={0.5} />
             <Link href="/signup">
-              <Button css={{ fontSize: "15px", height: '30px', width: '100px', backgroundColor: '#fff', color: '#000' }}>Create Account</Button>
+              <div style={{ userSelect: "none", cursor: "pointer", touchAction: "manipulation", height: '33px', width: '130px', alignContent: "center", borderRadius: "10px", textAlign: 'center', fontSize: "15px", backgroundColor: '#fff', color: '#000' }}>Create Account</div>
             </Link>
           </>
         }
