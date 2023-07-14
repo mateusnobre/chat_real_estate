@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEffect, useState } from 'react';
-import DocumentUploader from './DocumentUploader.tsx';
-import DocumentViewer from './DocumentViewer.tsx';
+import DocumentUploader from './DocumentUploader';
+import DocumentViewer from './DocumentViewer';
 
 import styled from 'styled-components';
 import useApiClient from '../helpers/api';

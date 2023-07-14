@@ -15,7 +15,7 @@ class RegisterView(APIView):
     def post(self, request):
         form = NewUserForm(request.POST)
         if form.is_valid():
-            user = form.save()
+            form.save()
             login = LoginView()
 
             login_response = login.post(
@@ -46,12 +46,12 @@ class LoginView(APIView):
             password = kwargs["password"]
         try:
             user = Customer.objects.get(email=email)
-        except Customer.DoesNotExist:
-            raise AuthenticationFailed("Account does not exist")
+        except Customer.DoesNotExist as e:
+            raise AuthenticationFailed("Account does not exist") from e
         if user is None:
-            raise AuthenticationFailed("Customer does not exist")
+            raise AuthenticationFailed("Customer does not exist") from None
         if not user.check_password(password):
-            raise AuthenticationFailed("Incorrect Password")
+            raise AuthenticationFailed("Incorrect Password") from None
         access_token = str(AccessToken.for_user(user))
         refresh_token = str(RefreshToken.for_user(user))
         return HttpResponse(
@@ -69,8 +69,8 @@ class LogoutView(APIView):
                 token = RefreshToken(refresh_token)
                 token.blacklist()
             return Response("Logout Successful", status=status.HTTP_200_OK)
-        except TokenError:
-            raise AuthenticationFailed("Invalid Token")
+        except TokenError as e:
+            raise AuthenticationFailed("Invalid Token") from e
 
 
 class CustomerView(APIView):
@@ -81,7 +81,7 @@ class CustomerView(APIView):
             token = AccessToken(access_token)
             user_id = token["user_id"]
             return Response({"customer_id": user_id}, status=status.HTTP_200_OK)
-        except TokenError:
-            raise AuthenticationFailed("Invalid token")
-        except Customer.DoesNotExist:
-            raise AuthenticationFailed("Customer does not exist")
+        except TokenError as e:
+            raise AuthenticationFailed("Invalid token") from e
+        except Customer.DoesNotExist as e:
+            raise AuthenticationFailed("Customer does not exist") from e

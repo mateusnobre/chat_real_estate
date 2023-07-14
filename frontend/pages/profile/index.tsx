@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../../components/layout';
-import { useState, useEffect } from 'react';
-import { authCheck } from "../../utils/auth"
+import { authCheck } from "../../utils/auth";
+import styled from 'styled-components';
 
 const Profile = () => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const [newEmail, setNewEmail] = useState('');
 
   useEffect(() => {
@@ -39,14 +39,11 @@ const Profile = () => {
   };
 
   return (
-    <Layout
-      isAuthenticated={authCheck()}
-      title="Profile"
-    >
+    <Layout isAuthenticated={authCheck()} title="Profile" isSplashPage={true}>
       <h1>My User</h1>
 
       {user && (
-        <div className="profile">
+        <ProfileContainer>
           <h2>Profile Information</h2>
           <p>Name: {user.name}</p>
           <p>Email: {user.email}</p>
@@ -69,23 +66,18 @@ const Profile = () => {
           <button>Upgrade</button>
           <button>Downgrade</button>
           <a href="https://buy.stripe.com/test_bIYg0NcLd5Iu3ok7ss">Buy a plan</a>
-
-        </div>
+        </ProfileContainer>
       )}
-
-      <style jsx>{`
-          .profile h4 {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 30px;
-          }
-
-          .profile-details {
-            padding: 10px;
-          }
-        `}</style>
     </Layout>
   );
 };
+
+const ProfileContainer = styled.div`
+  h2 {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 30px;
+  }
+`;
 
 export default Profile;

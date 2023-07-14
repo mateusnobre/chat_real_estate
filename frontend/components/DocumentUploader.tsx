@@ -3,6 +3,8 @@ import { ChangeEvent, useState } from 'react';
 import { CircleLoader } from 'react-spinners';
 import styled from 'styled-components';
 import useApiClient from '../helpers/api';
+
+import { Button, Input } from '@nextui-org/react';
 const Uploader = styled.div`
 
 width: 400px;
@@ -22,20 +24,18 @@ label {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-around;
   border-radius: 4px;
   font-size: 14px;
   font-weight: 600;
   color: ${props => props.theme.text_main};
   font-size: 14px;
   background-color: ${props => props.theme.secondary};
-  box-shadow: 2px 2px 2px rgba(0, 0, 0, 0.25);
   width: 100%;
   height: 40px;
-
+  border: 1px solid ${props => props.theme.secondary};
   svg {
-    height: 16px;
-    margin-right: 4px;
+    height: 20px;
   }
 
   &:hover {
@@ -51,12 +51,8 @@ display: flex;
 flex-direction: row;
 justify-content: flex-start;
 align-items: center;
-height: 100px;
 width: 100%;
 
-padding: 5px;
-margin-top: 20px
-margin-bottom: 20px
 text-align: left;
 overflow: hidden;
 border-radius: 5px;
@@ -68,24 +64,6 @@ p {
 
 }
 `
-
-const UploaderButton = styled.button`
-cursor: pointer;
-display: inline-flex;
-align-items: center;
-justify-content: center;
-border-radius: 4px;
-font-size: 14px;
-font-weight: 600;
-color: ${props => props.theme.text_main};
-font-size: 14px;
-padding: 5px 8px;
-box-shadow: 0px 0px 2px rgba(0, 0, 0, 0.25);
-width: 100%;
-border: none;
-align-self: center;
-`
-
 const UploaderLoader = styled.div`
 align-self: center;
 
@@ -156,7 +134,7 @@ const DocumentUploader = ({ setRefreshViewer, indexName }: DocumentUploaderProps
             d='M296 384h-80c-13.3 0-24-10.7-24-24V192h-87.7c-17.8 0-26.7-21.5-14.1-34.1L242.3 5.7c7.5-7.5 19.8-7.5 27.3 0l152.2 152.2c12.6 12.6 3.7 34.1-14.1 34.1H320v168c0 13.3-10.7 24-24 24zm216-8v112c0 13.3-10.7 24-24 24H24c-13.3 0-24-10.7-24-24V376c0-13.3 10.7-24 24-24h136v8c0 30.9 25.1 56 56 56h80c30.9 0 56-25.1 56-56v-8h136c13.3 0 24 10.7 24 24zm-124 88c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20zm64 0c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20z'
           ></path>
         </svg>
-        <span>Upload file (.pdf,.txt,.json,.md,.xlsx,.xls,.csv,.html, .docx., doc)</span>
+        <span>(.pdf,.txt,.json,.md,.xlsx,.xls,.csv,.html, .docx., doc)</span>
       </label>
       {isFilePicked && selectedFile ? (
         <UploaderDetails>
@@ -171,9 +149,9 @@ const DocumentUploader = ({ setRefreshViewer, indexName }: DocumentUploaderProps
       )}
 
       {isFilePicked && !isLoading && (
-        <UploaderButton onClick={handleSubmission}>
+        <Button onClick={handleSubmission}>
           Submit
-        </UploaderButton>
+        </Button>
       )}
       {isLoading && <UploaderLoader><CircleLoader color='#00f596' /></UploaderLoader>}
     </Uploader>

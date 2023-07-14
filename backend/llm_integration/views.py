@@ -34,15 +34,52 @@ from google.cloud import storage
 from django.shortcuts import get_object_or_404
 from .models import Index
 from django.http import HttpResponse, JsonResponse
-from django.core import serializers
 from django.core.exceptions import ObjectDoesNotExist
 import glob
 import os
 import shutil
-
+from rest_framework_simplejwt.tokens import AccessToken
 from django.core.files.storage import default_storage
 from django.http import HttpResponseBadRequest, HttpResponseServerError
 from django.core.files.base import ContentFile
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+from langchain.embeddings.huggingface import HuggingFaceEmbeddings
+from llama_index.embeddings import LangchainEmbedding
+from llama_index.prompts import Prompt
+
+from llama_index.callbacks import CallbackManager, TokenCountingHandler
+import gcsfs
+
+
+token_counter = TokenCountingHandler(
+    tokenizer=tiktoken.encoding_for_model("gpt-3.5-turbo").encode
+)
+
+callback_manager = CallbackManager([token_counter])
+
+text_qa_template_str = (
+    "Context information is below.\n"
+    "---------------------\n"
+    "{context_str}\n"
+    "---------------------\n"
+    "Using both the context information and also using your own knowledge, "
+    "answer the question: {query_str}\n"
+    "If the context isn't helpful, you can also answer the question on your own.\n"
+)
+TEXT_QA_TEMPLATE = Prompt(text_qa_template_str)
+
+refine_template_str = (
+    "The original question is as follows: {query_str}\n"
+    "We have provided an existing answer: {existing_answer}\n"
+    "We have the opportunity to refine the existing answer "
+    "(only if needed) with some more context below.\n"
+    "------------\n"
+    "{context_msg}\n"
+    "------------\n"
+    "Using the new context and your own knowledege,update/repeat the existing answer.\n"
+)
+REFINE_TEMPLATE = Prompt(refine_template_str)
 
 INDEX_PREFIX = settings.INDEX_PREFIX
 PKL_PREFIX = settings.PKL_PREFIX
@@ -55,19 +92,43 @@ llm_predictor = LLMPredictor(
         temperature=TEMPERATURE,
         model_name=OPEN_AI_MODEL_NAME,
         openai_api_key=OPEN_AI_API_KEY,
-    )
+    ),
+    # callback=StreamingStdOutCallbackHandler(streaming=True),
 )
 
 GCLOUD_PROJECT_ID = settings.GCLOUD_PROJECT_ID
 # define prompt helper
 prompt_helper = PromptHelper(MAX_INPUT_SIZE, NUM_OUTPUT, MAX_CHUNK_OVERLAP)
 
+
+model_name = "sentence-transformers/all-MiniLM-L6-v2"
+model_kwargs = {"device": "cpu"}
+encode_kwargs = {"normalize_embeddings": False}
+embed_model = LangchainEmbedding(
+    HuggingFaceEmbeddings(
+        model_name=model_name, model_kwargs=model_kwargs, encode_kwargs=encode_kwargs
+    )
+)
+
 SERVICE_CONTEXT = ServiceContext.from_defaults(
     llm_predictor=llm_predictor,
     prompt_helper=prompt_helper,
     chunk_size_limit=CHUNK_SIZE_LIMIT,
+    embed_model=embed_model,
+    callback_manager=callback_manager,
 )
 
+QDRANT_CLIENT = QdrantClient(
+    url=settings.QDRANT_URL,
+    api_key=settings.QDRANT_API_KEY,
+)
+
+
+token_counter = TokenCountingHandler(
+    tokenizer=tiktoken.encoding_for_model("gpt-3.5-turbo").encode
+)
+
+callback_manager = CallbackManager([token_counter])
 
 # Create your views here.
 
@@ -94,6 +155,12 @@ GCLOUD_STORAGE_BUCKET = settings.GCLOUD_STORAGE_BUCKET
 BUCKET = storage.Bucket(client, GCLOUD_STORAGE_BUCKET)
 CREDENTIALS = service_account.Credentials.from_service_account_file("creds.json")
 LOCK = Lock()
+scoped_credentials = CREDENTIALS.with_scopes(
+    ["https://www.googleapis.com/auth/cloud-platform"]
+)
+GCP_FS = gcsfs.GCSFileSystem(
+    project=settings.GCLOUD_PROJECT_ID, token=scoped_credentials
+)
 
 
 def upload_from_directory(directory_path: str):
@@ -119,32 +186,42 @@ def query_index(request):
         return JsonResponse({"error": "Invalid request method"}, status=400)
     query_text = request.GET.get("text")
     index_name = request.GET.get("index_name")
-    customer_id = request.headers.get("Authorization").split(" ")[2]
+    access_token = request.headers.get("Authorization").split(" ")[1]
+    token = AccessToken(access_token)
+    customer_id = str(token["user_id"])
+
     index_path = INDEX_PREFIX + "_" + customer_id + "_" + index_name
 
-    storage_context = StorageContext.from_defaults(persist_dir=index_path)
-
+    qdrant_vector_store = QdrantVectorStore(
+        client=QDRANT_CLIENT, collection_name=index_path
+    )
+    storage_context = StorageContext.from_defaults(
+        vector_store=qdrant_vector_store,
+        persist_dir=f"{GCLOUD_STORAGE_BUCKET}/" + index_path,
+        fs=GCP_FS,
+    )
     index = load_index_from_storage(
         service_context=SERVICE_CONTEXT, storage_context=storage_context
     )
 
     if query_text is None:
         return JsonResponse(
-            {
-                "error": "No text found, please include a ?text=blah parameter in the URL"
-            },
+            {"error": "No text found"},
             status=400,
         )
     if index != "":
-        query_engine = index.as_query_engine()
+        query_engine = index.as_query_engine(
+            text_qa_template=TEXT_QA_TEMPLATE,
+            refine_template=REFINE_TEMPLATE,
+        )
         response = query_engine.query(query_text)
+
         response_json = {
             "text": str(response),
             "sources": [
                 {
                     "text": str(x.node.text),
                     "similarity": round(x.score, 2),
-                    "doc_id": str(x.node.metadata["file_name"]),
                     "start": x.node.start_char_idx,
                     "end": x.node.end_char_idx,
                 }
@@ -164,7 +241,14 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
     """Insert new document into a specific index."""
     index_path = INDEX_PREFIX + "_" + customer_id + "_" + index_name
     pkl_path = PKL_PREFIX + "_" + customer_id + "_" + index_name + ".pkl"
-    storage_context = StorageContext.from_defaults(persist_dir=index_path)
+    qdrant_vector_store = QdrantVectorStore(
+        client=QDRANT_CLIENT, collection_name=index_path
+    )
+    storage_context = StorageContext.from_defaults(
+        vector_store=qdrant_vector_store,
+        persist_dir=f"{GCLOUD_STORAGE_BUCKET}/" + index_path,
+        fs=GCP_FS,
+    )
 
     stored_docs = {}
     with open(pkl_path, "rb") as f:
@@ -212,16 +296,18 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
                 "n_tokens": num_tokens_from_string(document.text, OPEN_AI_MODEL_NAME),
             }  # only take the first 200 chars
             index.insert(document)
-            index.storage_context.persist(persist_dir=index_path)
-            upload_from_directory(index_path)
-            # Save index and stored docs to their respective locations (e.g., Blob Storage)
+            index.storage_context.persist(
+                persist_dir=f"{GCLOUD_STORAGE_BUCKET}/" + index_path, fs=GCP_FS
+            )
+
+            # Save index and stored docs to their respective locations
             with open(pkl_path, "wb") as f:
                 pickle.dump(stored_docs, f)
                 stored_docs_blob.upload_from_filename(pkl_path)
             # Perform the necessary upload operations to the storage location
         # Cleanup temp file
         default_storage.delete(doc_file_path)
-    except Exception as e:
+    except Exception:
         default_storage.delete(doc_file_path)
         traceback.print_exc()
     return
@@ -239,7 +325,10 @@ def upload_file(request):
     )
 
     index_name = request.GET.get("index_name")
-    customer_id = request.headers.get("Authorization").split(" ")[2]
+    access_token = request.headers.get("Authorization").split(" ")[1]
+    token = AccessToken(access_token)
+    customer_id = str(token["user_id"])
+
     try:
         if filename.endswith(".xlsx") or filename.endswith(".xls"):
             urls = pd.read_excel(filepath, header=None, names=["URL"])
@@ -265,7 +354,9 @@ def upload_file(request):
 @csrf_exempt
 def get_documents(request):
     index_name = request.GET.get("index_name")
-    customer_id = request.headers.get("Authorization").split(" ")[2]
+    access_token = request.headers.get("Authorization").split(" ")[1]
+    token = AccessToken(access_token)
+    customer_id = str(token["user_id"])
     pkl_path = PKL_PREFIX + "_" + customer_id + "_" + index_name + ".pkl"
 
     if os.path.exists(pkl_path):
@@ -285,7 +376,7 @@ def index_list(request):
         indexes = Index.objects.all()
         data = serializers.serialize("json", indexes)
         return HttpResponse(data, content_type="application/json", status=200)
-    except Exception as e:
+    except Exception:
         return HttpResponse(status=500)
 
 
@@ -293,7 +384,10 @@ def index_list(request):
 def index_create(request):
     try:
         if request.method == "POST":
-            customer_id = request.headers.get("Authorization").split(" ")[2]
+            access_token = request.headers.get("Authorization").split(" ")[1]
+            token = AccessToken(access_token)
+            customer_id = str(token["user_id"])
+
             index_name = request.POST.get("name")
             form = IndexForm({"name": index_name, "customer": customer_id})
             if form.is_valid():
@@ -302,12 +396,20 @@ def index_create(request):
                 stored_docs_blob = BUCKET.blob(pkl_path)
 
                 with LOCK:
-                    index = GPTVectorStoreIndex(
-                        [],
+                    qdrant_vector_store = QdrantVectorStore(
+                        client=QDRANT_CLIENT, collection_name=index_path
+                    )
+                    storage_context = StorageContext.from_defaults(
+                        vector_store=qdrant_vector_store,
+                    )
+                    index = GPTVectorStoreIndex.from_documents(
+                        [Document(text="I do not know", doc_id="test")],
+                        storage_context=storage_context,
                         service_context=SERVICE_CONTEXT,
                     )
-                    index.storage_context.persist(persist_dir=index_path)
-                    upload_from_directory(index_path)
+                    index.storage_context.persist(
+                        persist_dir=f"{GCLOUD_STORAGE_BUCKET}/" + index_path, fs=GCP_FS
+                    )
                     with open(pkl_path, "wb") as f:
                         pickle.dump({}, f)
                     stored_docs_blob.upload_from_filename(pkl_path)
@@ -318,7 +420,7 @@ def index_create(request):
         else:
             form = IndexForm()
         return HttpResponse(status=400)
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return HttpResponse(status=500)
 
@@ -328,7 +430,10 @@ def index_delete(request, pk):
     try:
         index = get_object_or_404(Index, pk=pk)
         if request.method == "DELETE":
-            customer_id = request.headers.get("Authorization").split(" ")[2]
+            access_token = request.headers.get("Authorization").split(" ")[1]
+            token = AccessToken(access_token)
+            customer_id = str(token["user_id"])
+
             index_path = INDEX_PREFIX + "_" + customer_id + "_" + index.name
             pkl_path = PKL_PREFIX + "_" + customer_id + "_" + index.name + ".pkl"
             try:
@@ -339,7 +444,7 @@ def index_delete(request, pk):
                 stored_docs_blob = BUCKET.blob(pkl_path)
                 stored_docs_blob.delete()
                 os.remove(pkl_path)
-            except:
+            except Exception:
                 traceback.print_exc()
 
             index.delete()
@@ -347,7 +452,7 @@ def index_delete(request, pk):
         return HttpResponse(status=400)
     except ObjectDoesNotExist:
         return HttpResponse(status=404)
-    except Exception as e:
+    except Exception:
         return HttpResponse(status=500)
 
 
@@ -357,7 +462,7 @@ def get_indexes_by_user(request, customer_id):
         indexes = Index.objects.filter(customer_id=customer_id)
         data = serializers.serialize("json", indexes)
         return HttpResponse(data, content_type="application/json", status=200)
-    except Exception as e:
+    except Exception:
         return HttpResponse(status=500)
 
 
@@ -369,5 +474,5 @@ def get_index_by_id(request, pk):
         return HttpResponse(data, content_type="application/json", status=200)
     except ObjectDoesNotExist:
         return HttpResponse(status=404)
-    except Exception as e:
+    except Exception:
         return HttpResponse(status=500)

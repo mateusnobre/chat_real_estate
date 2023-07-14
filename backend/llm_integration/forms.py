@@ -6,4 +6,3 @@ class IndexForm(forms.ModelForm):
     class Meta:
         model = Index
         fields = ["name", "customer"]
-    

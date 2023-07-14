@@ -11,4 +11,11 @@ module.exports = {
       process.env.STRIPE_PUBLIC_KEY &&
       process.env.STRIPE_PUBLIC_KEY.indexOf('pk') > -1,
   },
+  settings: {
+    'import/resolver': {
+      'node': {
+        'extensions': ['.js', '.jsx', '.ts', '.tsx']
+      }
+    }
+  }
 };

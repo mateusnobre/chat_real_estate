@@ -18,6 +18,8 @@ COPY backend/ /app/backend/
 # Copy and install backend dependencies
 COPY backend/pyproject.toml /app/backend/
 RUN pip install poetry && cd backend && poetry install --no-root --no-dev
+RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
 
 # Run Django migrations
 RUN cd backend && poetry run python manage.py makemigrations && poetry run python manage.py migrate
@@ -26,4 +28,4 @@ RUN cd backend && poetry run python manage.py makemigrations && poetry run pytho
 EXPOSE 8000
 
 # Start the Django server
-CMD cd backend && poetry run gunicorn backend.wsgi:application --bind 0.0.0.0:8000
+CMD cd backend && poetry run python manage.py runserver

@@ -33,10 +33,16 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 
 DEBUG = "RENDER" not in os.environ
+
+
 ALLOWED_HOSTS = []
 RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME")
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+if DEBUG:
+    ALLOWED_HOSTS.append("*")
+
 
 OPENAI_API_KEY = env("OPENAI_API_KEY")
 GCLOUD_PROJECT_ID = env("GCLOUD_PROJECT_ID")
@@ -50,6 +56,8 @@ PKL_PREFIX = env("PKL_PREFIX")
 INDEX_PREFIX = env("INDEX_PREFIX")
 
 
+QDRANT_URL = env("QDRANT_URL")
+QDRANT_API_KEY = env("QDRANT_API_KEY")
 DB_NAME = env("DB_NAME")
 DB_USER = env("DB_USER")
 DB_HOST = env("DB_HOST")
@@ -170,13 +178,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-# This setting tells Django at which URL static files are going to be served to the user.
-# Here, they well be accessible at your-domain.onrender.com/static/...
 STATIC_URL = "/static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-DEBUG_PROPAGATE_EXCEPTIONS = True
+DEBUG_PROPAGATE_EXCEPTIONS = False
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_METHODS = (
     "DELETE",
@@ -194,6 +200,7 @@ CORS_ALLOW_HEADERS = (
     "x-csrftoken",
     "x-requested-with",
     "access-control-allow-origin",
+    "customer-id",
 )
 # CORS_ALLOWED_ORIGINS = [
 #     "http://localhost:3000",

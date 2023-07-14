@@ -2,11 +2,18 @@ import React from 'react';
 import NextHead from 'next/head';
 import { string } from 'prop-types';
 
+interface HeadProps {
+  title?: string;
+  description?: string;
+  url?: string;
+  ogImage?: string;
+}
+
 const defaultDescription = '';
 const defaultOGURL = '';
 const defaultOGImage = '';
 
-const Head = (props) => (
+const Head: React.FC<HeadProps> = (props) => (
   <NextHead>
     <meta charSet="UTF-8" />
     <title>{props.title || ''}</title>
