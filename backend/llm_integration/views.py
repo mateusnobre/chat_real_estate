@@ -1,5 +1,7 @@
 import json
 import traceback
+
+from langchain import SQLDatabaseChain
 from llm_integration.forms import IndexForm
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
@@ -7,7 +9,6 @@ import pickle
 from google.oauth2 import service_account
 from multiprocessing import Lock
 from langchain.document_loaders import YoutubeLoader
-from langchain.chat_models import ChatOpenAI
 from django.core import serializers
 from llama_index import (
     LLMPredictor,
@@ -18,8 +19,12 @@ from llama_index import (
     ServiceContext,
     StorageContext,
     load_index_from_storage,
+    SQLDatabase,
+    GPTVectorStoreIndex,
 )
-from llama_index import GPTVectorStoreIndex
+from llama_index.indices.struct_store import (
+    NLSQLTableQueryEngine
+)
 import pandas as pd
 import tiktoken
 from .globals import (
@@ -35,7 +40,6 @@ from django.shortcuts import get_object_or_404
 from .models import Index
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ObjectDoesNotExist
-import glob
 import os
 import shutil
 from rest_framework_simplejwt.tokens import AccessToken
@@ -50,6 +54,30 @@ from llama_index.prompts import Prompt
 
 from llama_index.callbacks import CallbackManager, TokenCountingHandler
 import gcsfs
+from llama_index.agent import ReActAgent
+from sqlalchemy.engine import create_engine
+from llama_index.tools import QueryEngineTool,ToolMetadata
+from langchain.chat_models import ChatOpenAI
+from langchain import SQLDatabase, SQLDatabaseChain
+
+from langchain.prompts.prompt import PromptTemplate
+
+_DEFAULT_TEMPLATE = """Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
+Use the following format:
+
+Question: "Question here"
+SQLQuery: "SQL Query to run"
+SQLResult: "Result of the SQLQuery"
+Answer: "Final answer here"
+
+Only use the following tables:
+
+{table_info}
+
+Question: {input}"""
+SQL_PROMPT = PromptTemplate(
+    input_variables=["input", "table_info", "dialect"], template=_DEFAULT_TEMPLATE
+)
 
 
 token_counter = TokenCountingHandler(
@@ -86,13 +114,13 @@ PKL_PREFIX = settings.PKL_PREFIX
 OPEN_AI_API_KEY = settings.OPENAI_API_KEY
 
 LOCK = Lock()
-
-llm_predictor = LLMPredictor(
-    llm=ChatOpenAI(
+LLM = ChatOpenAI(
         temperature=TEMPERATURE,
         model_name=OPEN_AI_MODEL_NAME,
         openai_api_key=OPEN_AI_API_KEY,
-    ),
+    )
+llm_predictor = LLMPredictor(
+    llm=LLM
     # callback=StreamingStdOutCallbackHandler(streaming=True),
 )
 
@@ -123,11 +151,6 @@ QDRANT_CLIENT = QdrantClient(
     api_key=settings.QDRANT_API_KEY,
 )
 
-
-token_counter = TokenCountingHandler(
-    tokenizer=tiktoken.encoding_for_model("gpt-3.5-turbo").encode
-)
-
 callback_manager = CallbackManager([token_counter])
 
 # Create your views here.
@@ -150,10 +173,17 @@ with open("creds.json", "w") as creds_file:
     creds_file.write(json.dumps(CREDENTIALS_JSON))
 
 
-client = storage.Client.from_service_account_json(json_credentials_path="creds.json")
+
+SQL_ENGINE = create_engine(f'bigquery://{settings.GCLOUD_PROJECT_ID}', location="US",credentials_path="creds.json")
+STORAGE_CLIENT = storage.Client.from_service_account_json(json_credentials_path="creds.json")
 GCLOUD_STORAGE_BUCKET = settings.GCLOUD_STORAGE_BUCKET
-BUCKET = storage.Bucket(client, GCLOUD_STORAGE_BUCKET)
+BUCKET = storage.Bucket(STORAGE_CLIENT, GCLOUD_STORAGE_BUCKET)
 CREDENTIALS = service_account.Credentials.from_service_account_file("creds.json")
+
+BIGQUERY_TABLES = [
+            "land_com_final",
+]
+
 LOCK = Lock()
 scoped_credentials = CREDENTIALS.with_scopes(
     ["https://www.googleapis.com/auth/cloud-platform"]
@@ -161,16 +191,6 @@ scoped_credentials = CREDENTIALS.with_scopes(
 GCP_FS = gcsfs.GCSFileSystem(
     project=settings.GCLOUD_PROJECT_ID, token=scoped_credentials
 )
-
-
-def upload_from_directory(directory_path: str):
-    dest_blob_name = directory_path
-    rel_paths = glob.glob(directory_path + "/**", recursive=True)
-    for local_file in rel_paths:
-        remote_path = f'{dest_blob_name}/{"/".join(local_file.split(os.sep)[1:])}'
-        if os.path.isfile(local_file):
-            blob = BUCKET.blob(remote_path)
-            blob.upload_from_filename(local_file)
 
 
 def num_tokens_from_string(string: str, model_name: str) -> int:
@@ -186,6 +206,33 @@ def query_index(request):
         return JsonResponse({"error": "Invalid request method"}, status=400)
     query_text = request.GET.get("text")
     index_name = request.GET.get("index_name")
+    
+    if index_name.split(" ")[0] == "BigQuery":
+        try:
+            table_name = index_name.split(" ")[1]
+            print(index_name)
+            sql_database = SQLDatabase(SQL_ENGINE, include_tables=[settings.GCLOUD_DATABASE+"."+table_name])
+            db_chain = SQLDatabaseChain.from_llm(LLM, sql_database, prompt=SQL_PROMPT, verbose=True,return_intermediate_steps=True)
+            response = db_chain.__call__(query_text,include_run_info=True)
+            sql_query = response["intermediate_steps"][1]
+            sql_result = response["intermediate_steps"][3]
+
+            response_json = {
+            "text": (response["result"]),
+            "sources": [
+                {
+                    "sql_query": sql_query,
+                    "sql_result": sql_result,
+                }
+            ],
+            }
+            print(response_json)
+            return JsonResponse(response_json, status=200)
+        except Exception as e:
+            traceback.print_exc()
+            return JsonResponse(status=500)
+
+
     access_token = request.headers.get("Authorization").split(" ")[1]
     token = AccessToken(access_token)
     customer_id = str(token["user_id"])
@@ -209,32 +256,36 @@ def query_index(request):
             {"error": "No text found"},
             status=400,
         )
-    if index != "":
-        query_engine = index.as_query_engine(
-            text_qa_template=TEXT_QA_TEMPLATE,
-            refine_template=REFINE_TEMPLATE,
-        )
-        response = query_engine.query(query_text)
+    try:
+        if index is not None:
+            selected_query_engine = index.as_query_engine(
+                text_qa_template=TEXT_QA_TEMPLATE,
+                refine_template=REFINE_TEMPLATE,
+            )
+            
+            response = selected_query_engine.query(query_text)    
+            response_json = {
+                "text": str(response),
+                "sources": [
+                    {
+                        "text": str(x.node.text),
+                        "similarity": round(x.score, 2),
+                        "start": x.node.start_char_idx,
+                        "end": x.node.end_char_idx,
+                    }
+                    for x in response.source_nodes
+                ],
+            }
+        else:
+            return JsonResponse(
+                {"error": "No agent selected"},
+                status=400,
+            )
 
-        response_json = {
-            "text": str(response),
-            "sources": [
-                {
-                    "text": str(x.node.text),
-                    "similarity": round(x.score, 2),
-                    "start": x.node.start_char_idx,
-                    "end": x.node.end_char_idx,
-                }
-                for x in response.source_nodes
-            ],
-        }
-    else:
-        return JsonResponse(
-            {"error": "No agent selected"},
-            status=400,
-        )
-
-    return JsonResponse(response_json, status=200)
+        return JsonResponse(response_json, status=200)
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_id=None):
@@ -354,20 +405,25 @@ def upload_file(request):
 @csrf_exempt
 def get_documents(request):
     index_name = request.GET.get("index_name")
+    if index_name.split(" ")[0] == "BigQuery":
+        return HttpResponse([], status=200)
     access_token = request.headers.get("Authorization").split(" ")[1]
     token = AccessToken(access_token)
     customer_id = str(token["user_id"])
     pkl_path = PKL_PREFIX + "_" + customer_id + "_" + index_name + ".pkl"
-
-    if os.path.exists(pkl_path):
-        with open(pkl_path, "rb") as f:
-            stored_docs = pickle.load(f)
-        documents_list = []
-        for doc_id, doc_text in stored_docs.items():
-            documents_list.append({"id": doc_id, "text": doc_text})
-        return JsonResponse(documents_list, safe=False, status=200)
-    else:
-        return HttpResponse([], status=200)
+    try:
+        if os.path.exists(pkl_path):
+            with open(pkl_path, "rb") as f:
+                stored_docs = pickle.load(f)
+            documents_list = []
+            for doc_id, doc_text in stored_docs.items():
+                documents_list.append({"id": doc_id, "text": doc_text})
+            return JsonResponse(documents_list, safe=False, status=200)
+        else:
+            return HttpResponse([], status=200)
+    except:
+        traceback.print_exc()
+        return HttpResponse([], status=500)
 
 
 @csrf_exempt
@@ -462,7 +518,8 @@ def get_indexes_by_user(request, customer_id):
         indexes = Index.objects.filter(customer_id=customer_id)
         data = serializers.serialize("json", indexes)
         return HttpResponse(data, content_type="application/json", status=200)
-    except Exception:
+    except Exception as e:
+        traceback.print_exc()
         return HttpResponse(status=500)
 
 

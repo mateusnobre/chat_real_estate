@@ -47,6 +47,7 @@ if DEBUG:
 OPENAI_API_KEY = env("OPENAI_API_KEY")
 GCLOUD_PROJECT_ID = env("GCLOUD_PROJECT_ID")
 GCLOUD_STORAGE_BUCKET = env("GCLOUD_STORAGE_BUCKET")
+GCLOUD_DATABASE=env("GCLOUD_DATABASE")
 GCLOUD_PRIVATE_KEY_ID = env("GCLOUD_PRIVATE_KEY_ID")
 GCLOUD_PRIVATE_KEY = env("GCLOUD_PRIVATE_KEY")
 GCLOUD_CLIENT_EMAIL = env("GCLOUD_CLIENT_EMAIL")
@@ -251,12 +252,12 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["file", "console"],  # Add 'console' handler
+            "handlers": ["file"],  # Add 'console' handler
             "propagate": True,
             "level": "DEBUG",
         },
         "MYAPP": {
-            "handlers": ["file", "console"],  # Add 'console' handler
+            "handlers": ["file"],  # Add 'console' handler
             "level": "DEBUG",
         },
     },

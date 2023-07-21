@@ -3,7 +3,6 @@ import Layout from '../../components/layout';
 import { authCheck } from '../../utils/auth';
 import useApiClient from '../../helpers/api';
 import styled, { css } from 'styled-components';
-import classNames from 'classnames';
 import Cookies from 'universal-cookie';
 import DocumentTools from '../../components/DocumentTools';
 import { Button, Dropdown, Input, Spacer } from '@nextui-org/react';
@@ -107,11 +106,6 @@ const SourcesItem = styled.div`
   }
 `;
 
-const SQLSource = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-`;
 const ContentContainer = styled.div`
     display: flex;
     flex-direction: row;
@@ -134,20 +128,24 @@ const SubContentContainer = styled.div`
 const cookies = new Cookies();
 
 const Dashboard: React.FC = () => {
-  const [indexes, setIndexes] = useState<{ id: string; name: string; customer_id: string }[]>([]);
+  const bigQueryIndexes = [
+    { id: '', name: "BigQuery land_com_final", customer_id: "" },
+    { id: '', name: "BigQuery har_com_for_sale_transformed", customer_id: "" },
+    { id: '', name: "BigQuery har_com_sold_merge", customer_id: "" },
+    { id: '', name: "BigQuery har_com_sold_vacant_empty_land_desc_transformed", customer_id: "" },
+  ]
+
+
+  const [indexes, setIndexes] = useState<{ id: string; name: string; customer_id: string }[]>(bigQueryIndexes);
   const [queryText, setQueryText] = useState('');
   const [responseText, setResponseText] = useState('');
   const [responseSources, setResponseSources] = useState<any[]>([]);
-  const [SQLQuery, setSQLQuery] = useState('');
-  const [resultSQLQuery, setResultSQLQuery] = useState('');
   const [isLoading, setLoading] = useState(false);
   const [indexName, setIndexName] = useState(new Set(["Select Data Source"]));;
   const selectedIndexName = React.useMemo(
-    () => Array.from(indexName).join(", ").replaceAll("_", " "),
+    () => Array.from(indexName).join(", "),
     [indexName]
   );
-  const [data_source, setDataSource] = useState('Documents');
-
   const apiClient = useApiClient();
 
   useEffect(() => {
@@ -164,7 +162,9 @@ const Dashboard: React.FC = () => {
 
       const response = await apiClient.makeRequest('GET', `/llm_integration/indexes/by-user-id/${customerId}/`);
       if (response && response.data) {
-        setIndexes(processIndexes(response.data));
+        const processedIndexes = processIndexes(response.data)
+        const finalIndexes = [...bigQueryIndexes, ...processedIndexes]
+        setIndexes(finalIndexes);
       }
     } catch (error) {
       console.error(error);
@@ -173,16 +173,28 @@ const Dashboard: React.FC = () => {
 
 
   const sourceElems = responseSources.map((source) => {
-    const nodeText = source.text.length > 150 ? source.text.substring(0, 130) + '...' : source.text;
+    if (source.text) {
+      const nodeText = source.text.length > 150 ? source.text.substring(0, 130) + '...' : source.text;
 
-    return (
-      <SourcesItem>
-        <p className="text">{nodeText}</p>
-        <p className="footer">
-          Similarity={source.similarity}, start={source.start}, end={source.end}
-        </p>
-      </SourcesItem>
-    );
+      return (
+        <SourcesItem>
+          <p className="text">{nodeText}</p>
+          <p className="footer">
+            Similarity={source.similarity}, start={source.start}, end={source.end}
+          </p>
+        </SourcesItem>
+      )
+    }
+    else {
+      return (
+        <SourcesItem>
+          <p className="text">SQL Result={source.sql_result}</p>
+          <p className="text">
+            SQL Query={source.sql_query}
+          </p>
+        </SourcesItem>
+      )
+    }
   });
 
   const handleQuerySubmit = async () => {
@@ -195,15 +207,9 @@ const Dashboard: React.FC = () => {
       setLoading(false);
       if (response) {
         const data = response.data;
-        if (data_source === 'BigQuery') {
-          setResponseText(data.summary);
-          setSQLQuery(data.sql_query);
-          setResultSQLQuery(data.text);
-        } else if (data_source === 'Documents') {
-          setResponseText(data.text);
-          setResponseSources(data.sources);
-          console.log(data.sources);
-        }
+        setResponseText(data.text);
+        setResponseSources(data.sources);
+        console.log(data.sources);
       }
     } catch (error) {
       console.error(error);
@@ -254,7 +260,7 @@ const Dashboard: React.FC = () => {
 
               <SourcesDiv loading={isLoading}>
                 <h4 className="id">Response Sources</h4>
-                {data_source === 'Documents' ? sourceElems : <SQLSource><h3>SQL Query</h3><p>{SQLQuery}</p><h4>SQL Query Result</h4><p>{resultSQLQuery}</p></SQLSource>}
+                {sourceElems}
               </SourcesDiv>
             </div>
           </SubContentContainer>
