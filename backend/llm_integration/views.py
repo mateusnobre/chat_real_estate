@@ -210,7 +210,6 @@ def query_index(request):
     if index_name.split(" ")[0] == "BigQuery":
         try:
             table_name = index_name.split(" ")[1]
-            print(index_name)
             sql_database = SQLDatabase(SQL_ENGINE, include_tables=[settings.GCLOUD_DATABASE+"."+table_name])
             db_chain = SQLDatabaseChain.from_llm(LLM, sql_database, prompt=SQL_PROMPT, verbose=True,return_intermediate_steps=True)
             response = db_chain.__call__(query_text,include_run_info=True)
@@ -226,7 +225,6 @@ def query_index(request):
                 }
             ],
             }
-            print(response_json)
             return JsonResponse(response_json, status=200)
         except Exception as e:
             traceback.print_exc()

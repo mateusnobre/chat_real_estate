@@ -221,7 +221,7 @@ const Dashboard: React.FC = () => {
       <DashboardContainer>
 
         <Dropdown>
-          <Dropdown.Button color="primary" css={{ tt: "capitalize", width: "200px", textAlign: "start" }}>
+          <Dropdown.Button color="primary" css={{ width: "300px", textAlign: "start", }}>
             {selectedIndexName !== 'Select Data Source' ? <>Data Source: {selectedIndexName}</> : <>{selectedIndexName}</>}
           </Dropdown.Button>
           <Dropdown.Menu
@@ -231,6 +231,7 @@ const Dashboard: React.FC = () => {
             selectedKeys={indexName}
             items={indexes}
             onSelectionChange={setIndexName}
+            css={{ $$dropdownMenuWidth: "500px" }}
           >
             {(item) => (
               <Dropdown.Item
