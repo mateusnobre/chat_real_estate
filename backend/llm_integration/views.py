@@ -298,8 +298,17 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
         persist_dir=f"{GCLOUD_STORAGE_BUCKET}/" + index_path,
         fs=GCP_FS,
     )
+    stored_docs_blob = BUCKET.blob(pkl_path)
 
     stored_docs = {}
+
+    if not os.path.exists(pkl_path):
+        if stored_docs_blob.exists():
+            stored_docs_blob.download_to_filename(pkl_path)
+        else:
+            with open(pkl_path, "wb") as f:
+                pickle.dump(stored_docs, f)
+
     with open(pkl_path, "rb") as f:
         stored_docs = pickle.load(f)
 
@@ -307,7 +316,6 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
         service_context=SERVICE_CONTEXT, storage_context=storage_context
     )
 
-    stored_docs_blob = BUCKET.blob(pkl_path)
 
     try:
         if kind == "text":
@@ -366,19 +374,17 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
 def upload_file(request):
     if "file" not in request.FILES:
         return HttpResponseBadRequest("Please send a POST request with a file")
-
-    uploaded_file = request.FILES["file"]
-    filename = uploaded_file.name
-    filepath = default_storage.save(
-        "documents/" + filename, ContentFile(uploaded_file.read())
-    )
-
-    index_name = request.GET.get("index_name")
-    access_token = request.headers.get("Authorization").split(" ")[1]
-    token = AccessToken(access_token)
-    customer_id = str(token["user_id"])
-
     try:
+        uploaded_file = request.FILES["file"]
+        filename = uploaded_file.name
+        filepath = default_storage.save(
+            "documents/" + filename, ContentFile(uploaded_file.read())
+        )
+
+        index_name = request.GET.get("index_name")
+        access_token = request.headers.get("Authorization").split(" ")[1]
+        token = AccessToken(access_token)
+        customer_id = str(token["user_id"])        
         if filename.endswith(".xlsx") or filename.endswith(".xls"):
             urls = pd.read_excel(filepath, header=None, names=["URL"])
             for url in urls["URL"]:

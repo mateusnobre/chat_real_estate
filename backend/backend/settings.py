@@ -252,12 +252,12 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["file"],  # Add 'console' handler
+            "handlers": ["file","console"],  # Add 'console' handler
             "propagate": True,
             "level": "DEBUG",
         },
         "MYAPP": {
-            "handlers": ["file"],  # Add 'console' handler
+            "handlers": ["file","console"],  # Add 'console' handler
             "level": "DEBUG",
         },
     },
