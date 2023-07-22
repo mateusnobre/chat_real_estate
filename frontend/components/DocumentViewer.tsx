@@ -18,7 +18,6 @@ const DocumentViewerList = styled.div`
 const DocumentViewerListItem = styled.div`
 
 border-bottom: 1px solid ${props => props.theme.text_main};
-height: 75px;
 overflow: hidden;
 
 &:last-child {
@@ -72,7 +71,7 @@ const DocumentViewer = ({ documentList, indexName }: DocumentViewerProps) => {
     newArray.unshift(value);
     return newArray;
   };
-
+  console.log(documentList);
   let documentListElems = documentList.map((document) => {
     // TODO - redo trimming using CSS and text-overflow: ellipsis
     const id =

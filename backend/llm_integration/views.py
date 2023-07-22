@@ -2,10 +2,9 @@ import json
 import traceback
 
 from langchain import SQLDatabaseChain
-from llm_integration.forms import IndexForm
+from llm_integration.forms import IndexForm, UploadedFileForm
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
-import pickle
 from google.oauth2 import service_account
 from multiprocessing import Lock
 from langchain.document_loaders import YoutubeLoader
@@ -22,9 +21,6 @@ from llama_index import (
     SQLDatabase,
     GPTVectorStoreIndex,
 )
-from llama_index.indices.struct_store import (
-    NLSQLTableQueryEngine
-)
 import pandas as pd
 import tiktoken
 from .globals import (
@@ -37,10 +33,9 @@ from .globals import (
 )
 from google.cloud import storage
 from django.shortcuts import get_object_or_404
-from .models import Index
+from .models import Index, UploadedFile
 from django.http import HttpResponse, JsonResponse
 from django.core.exceptions import ObjectDoesNotExist
-import os
 import shutil
 from rest_framework_simplejwt.tokens import AccessToken
 from django.core.files.storage import default_storage
@@ -54,13 +49,12 @@ from llama_index.prompts import Prompt
 
 from llama_index.callbacks import CallbackManager, TokenCountingHandler
 import gcsfs
-from llama_index.agent import ReActAgent
 from sqlalchemy.engine import create_engine
-from llama_index.tools import QueryEngineTool,ToolMetadata
 from langchain.chat_models import ChatOpenAI
 from langchain import SQLDatabase, SQLDatabaseChain
-
 from langchain.prompts.prompt import PromptTemplate
+
+
 
 _DEFAULT_TEMPLATE = """Given an input question, first create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
 Use the following format:
@@ -110,7 +104,6 @@ refine_template_str = (
 REFINE_TEMPLATE = Prompt(refine_template_str)
 
 INDEX_PREFIX = settings.INDEX_PREFIX
-PKL_PREFIX = settings.PKL_PREFIX
 OPEN_AI_API_KEY = settings.OPENAI_API_KEY
 
 LOCK = Lock()
@@ -289,7 +282,6 @@ def query_index(request):
 def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_id=None):
     """Insert new document into a specific index."""
     index_path = INDEX_PREFIX + "_" + customer_id + "_" + index_name
-    pkl_path = PKL_PREFIX + "_" + customer_id + "_" + index_name + ".pkl"
     qdrant_vector_store = QdrantVectorStore(
         client=QDRANT_CLIENT, collection_name=index_path
     )
@@ -298,20 +290,6 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
         persist_dir=f"{GCLOUD_STORAGE_BUCKET}/" + index_path,
         fs=GCP_FS,
     )
-    stored_docs_blob = BUCKET.blob(pkl_path)
-
-    stored_docs = {}
-
-    if not os.path.exists(pkl_path):
-        if stored_docs_blob.exists():
-            stored_docs_blob.download_to_filename(pkl_path)
-        else:
-            with open(pkl_path, "wb") as f:
-                pickle.dump(stored_docs, f)
-
-    with open(pkl_path, "rb") as f:
-        stored_docs = pickle.load(f)
-
     index = load_index_from_storage(
         service_context=SERVICE_CONTEXT, storage_context=storage_context
     )
@@ -346,21 +324,24 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
                 reader = BeautifulSoupWebReader()
                 document = reader.load_data(urls=[doc_file_path])[0]
 
-        if doc_id not in stored_docs:
+        doc_file = UploadedFile.objects.filter(name=doc_id).first()
+
+        if doc_file is None:
             # Keep track of stored docs -- llama_index doesn't make this easy
-            stored_docs[doc_id] = {
-                "text": document.text[0:100],
-                "n_tokens": num_tokens_from_string(document.text, OPEN_AI_MODEL_NAME),
-            }  # only take the first 200 chars
+
             index.insert(document)
             index.storage_context.persist(
                 persist_dir=f"{GCLOUD_STORAGE_BUCKET}/" + index_path, fs=GCP_FS
             )
 
+            index_object = Index.objects.filter(name=index_name, customer=customer_id).first()
+            uploaded_file_form = UploadedFileForm({"name": doc_id, "description": document.text[0:200], "index": index_object.index_id})
+            if uploaded_file_form.is_valid():
+                uploaded_file_form.save()
+            else:
+                print(uploaded_file_form.errors)
             # Save index and stored docs to their respective locations
-            with open(pkl_path, "wb") as f:
-                pickle.dump(stored_docs, f)
-                stored_docs_blob.upload_from_filename(pkl_path)
+         
             # Perform the necessary upload operations to the storage location
         # Cleanup temp file
         default_storage.delete(doc_file_path)
@@ -414,17 +395,16 @@ def get_documents(request):
     access_token = request.headers.get("Authorization").split(" ")[1]
     token = AccessToken(access_token)
     customer_id = str(token["user_id"])
-    pkl_path = PKL_PREFIX + "_" + customer_id + "_" + index_name + ".pkl"
+    index_object = Index.objects.filter(name=index_name, customer=customer_id).first()
+
     try:
-        if os.path.exists(pkl_path):
-            with open(pkl_path, "rb") as f:
-                stored_docs = pickle.load(f)
-            documents_list = []
-            for doc_id, doc_text in stored_docs.items():
-                documents_list.append({"id": doc_id, "text": doc_text})
-            return JsonResponse(documents_list, safe=False, status=200)
-        else:
-            return HttpResponse([], status=200)
+        documents_list = []
+        document_objects = list(UploadedFile.objects.filter(index=index_object.index_id))
+        for document in document_objects:
+            name = getattr(document,'name')
+            description = getattr(document,'description')
+            documents_list.append({"id": name, "text": description})
+        return JsonResponse(documents_list, safe=False, status=200)
     except:
         traceback.print_exc()
         return HttpResponse([], status=500)
@@ -452,8 +432,6 @@ def index_create(request):
             form = IndexForm({"name": index_name, "customer": customer_id})
             if form.is_valid():
                 index_path = INDEX_PREFIX + "_" + customer_id + "_" + index_name
-                pkl_path = PKL_PREFIX + "_" + customer_id + "_" + index_name + ".pkl"
-                stored_docs_blob = BUCKET.blob(pkl_path)
 
                 with LOCK:
                     qdrant_vector_store = QdrantVectorStore(
@@ -470,9 +448,7 @@ def index_create(request):
                     index.storage_context.persist(
                         persist_dir=f"{GCLOUD_STORAGE_BUCKET}/" + index_path, fs=GCP_FS
                     )
-                    with open(pkl_path, "wb") as f:
-                        pickle.dump({}, f)
-                    stored_docs_blob.upload_from_filename(pkl_path)
+
                 form.save()
                 return HttpResponse(status=201)
             else:
@@ -495,15 +471,11 @@ def index_delete(request, pk):
             customer_id = str(token["user_id"])
 
             index_path = INDEX_PREFIX + "_" + customer_id + "_" + index.name
-            pkl_path = PKL_PREFIX + "_" + customer_id + "_" + index.name + ".pkl"
             try:
                 shutil.rmtree(index_path)
                 blobs = BUCKET.list_blobs(prefix=index_path)
                 for blob in blobs:
                     blob.delete()
-                stored_docs_blob = BUCKET.blob(pkl_path)
-                stored_docs_blob.delete()
-                os.remove(pkl_path)
             except Exception:
                 traceback.print_exc()
 

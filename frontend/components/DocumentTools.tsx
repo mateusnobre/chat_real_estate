@@ -58,12 +58,11 @@ const DocumentTools = (index: any) => {
     if (!response || !response.data) {
       return;
     }
-    console.log(response.data);
     const documentList = response.data.map(
       (element: Document) => (
         {
           id: element.id,
-          text: element.text.text,
+          text: element.text,
         }
       )
     )

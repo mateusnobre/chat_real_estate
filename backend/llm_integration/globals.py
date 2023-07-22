@@ -1,5 +1,5 @@
 TEMPERATURE = 0
-OPEN_AI_MODEL_NAME = "gpt-3.5-turbo-16k"
+OPEN_AI_MODEL_NAME = "gpt-3.5-turbo"
 # set maximum input size
 MAX_INPUT_SIZE = 2049
 # set number of output tokens

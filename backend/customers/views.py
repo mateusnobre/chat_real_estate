@@ -70,7 +70,7 @@ class LogoutView(APIView):
                 token.blacklist()
             return Response("Logout Successful", status=status.HTTP_200_OK)
         except TokenError as e:
-            raise AuthenticationFailed("Invalid Token") from e
+            return Response("Logout Successful With Missing Token", status=status.HTTP_200_OK)
 
 
 class CustomerView(APIView):
