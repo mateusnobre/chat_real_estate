@@ -3,7 +3,10 @@ import Link from 'next/link';
 import Layout from '../components/layout';
 import { authCheck } from '../utils/auth';
 import styled from 'styled-components';
-import { Button, Spacer } from '@nextui-org/react';
+
+import '../interceptors/axios'
+
+import { Spacer } from '@nextui-org/react';
 
 const HomeContainer = styled.div`
   display: flex;

@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken, TokenErro
 from rest_framework import status
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
-
+from rest_framework.permissions import IsAuthenticated
 
 class RegisterView(APIView):
     @csrf_exempt
@@ -61,6 +61,7 @@ class LoginView(APIView):
 
 
 class LogoutView(APIView):
+    permission_classes = (IsAuthenticated,)
     @csrf_exempt
     def post(self, request):
         try:

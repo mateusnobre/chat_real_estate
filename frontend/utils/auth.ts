@@ -8,6 +8,7 @@ const apiClient = useApiClient();
 
 async function handleLogin(access_token: string, refresh_token: string) {
   logger.log('auth.handleLogin', access_token);
+  localStorage.clear()
   cookies.set('access_token', access_token);
   cookies.set('refresh_token', refresh_token);
 }
@@ -23,21 +24,9 @@ function logout() {
   redirect('/');
 }
 
-async function authCheck(): Promise<boolean> {
+ function authCheck(): boolean {
   if (!!cookies.get('access_token')) {
     logger.log('auth.isAuthenticated');
-    const whoAmI = await apiClient.makeRequest( 'GET', '/customers/who-am-i/')
-    console.log(whoAmI)
-    if (whoAmI.status !== 200) {
-      const refreshToken = await apiClient.makeRequest(
-        'POST',
-        '/customers/token/refresh/',
-        {refresh:localStorage.getItem('refresh_token')}
-        )
-      if (refreshToken.status === 200) {
-        handleLogin(refreshToken.data.access_token, refreshToken.data.refresh_token)
-      }
-    }
     return true;
   } else {
     return false;

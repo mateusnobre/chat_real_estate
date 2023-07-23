@@ -46,8 +46,7 @@ const useApiClient = () => {
         data: isPOST ? requestData : null,
       };
       const response: AxiosResponse = await axios(options);
-
-      if (response.status === 200 || response.status === 201 || response.status === 401) {
+      if (response.status === 200 || response.status === 201) {
         return {
           headers: response.headers,
           status: response.status,
