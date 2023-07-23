@@ -28,11 +28,11 @@ function RouteGuard({ children }: RouteGuardProps) {
         };
     }, [router]);
 
-    function authCheckURL(url: string) {
+    async function authCheckURL(url: string) {
         // redirect to login page if accessing a private page and not logged in
         const publicPaths = ['/login', '/', '/signup'];
         const path = url.split('?')[0];
-        const isAuthenticated = authCheck();
+        const isAuthenticated = await authCheck();
         if (!isAuthenticated && !publicPaths.includes(path)) {
             setIsAuthenticated(false);
             router.push({
