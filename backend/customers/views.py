@@ -69,7 +69,7 @@ class LogoutView(APIView):
                 token = RefreshToken(refresh_token)
                 token.blacklist()
             return Response("Logout Successful", status=status.HTTP_200_OK)
-        except TokenError as e:
+        finally:
             return Response("Logout Successful With Missing Token", status=status.HTTP_200_OK)
 
 
