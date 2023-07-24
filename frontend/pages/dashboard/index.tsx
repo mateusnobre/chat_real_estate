@@ -36,7 +36,7 @@ const ResultsDiv = styled.div < { loading: boolean } > `
 
   border: 1px solid ${(props) => props.theme.text_main};
   border-radius: 5px;
-  font-size: 12px;
+  font-size: 16px;
   height: 30vh;
   width: 50vw;
   margin-right: 30px;
@@ -72,7 +72,6 @@ const SourcesDiv = styled.div < { loading: boolean } > `
 `;
 
 const SourcesItem = styled.div`
-  height: 100px;
   border-bottom: 1px solid ${(props) => props.theme.text_main};
   margin: 0px;
   width: 100%;
@@ -125,18 +124,18 @@ const SubContentContainer = styled.div`
     height: 100%;
     text-align: center;
   `
-const cookies = new Cookies();
 
 const Dashboard: React.FC = () => {
   const bigQueryIndexes = [
-    { id: '', name: "BigQuery land_com_final", customer_id: "" },
-    { id: '', name: "BigQuery har_com_for_sale_transformed", customer_id: "" },
-    { id: '', name: "BigQuery har_com_sold_merge", customer_id: "" },
-    { id: '', name: "BigQuery har_com_sold_vacant_empty_land_desc_transformed", customer_id: "" },
+    { id: '', name: "BigQuery land_com_final" },
+    { id: '', name: "BigQuery har_com_for_sale_transformed" },
+    { id: '', name: "BigQuery har_com_sold_merge" },
+    { id: '', name: "BigQuery har_com_sold_vacant_empty_land_desc_transformed" },
+    { id: '', name: "AI_Tools" },
   ]
 
 
-  const [indexes, setIndexes] = useState<{ id: string; name: string; customer_id: string }[]>(bigQueryIndexes);
+  const [indexes, setIndexes] = useState<{ id: string; name: string; }[]>(bigQueryIndexes);
   const [queryText, setQueryText] = useState('');
   const [responseText, setResponseText] = useState('');
   const [responseSources, setResponseSources] = useState<any[]>([]);
@@ -153,14 +152,12 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const processIndexes = (data: any[]) => {
-    return data.map((index) => ({ id: index.pk, name: index.fields.name, customer_id: index.fields.customer }));
+    return data.map((index) => ({ id: index.pk, name: index.fields.name, }));
   };
 
   const fetchIndexes = async () => {
     try {
-      const customerId = cookies.get('customer_id');
-
-      const response = await apiClient.makeRequest('GET', `/llm_integration/indexes/by-user-id/${customerId}/`);
+      const response = await apiClient.makeRequest('GET', `/llm_integration/indexes/by-user-id/`);
       if (response && response.data) {
         const processedIndexes = processIndexes(response.data)
         const finalIndexes = [...bigQueryIndexes, ...processedIndexes]
@@ -174,7 +171,7 @@ const Dashboard: React.FC = () => {
 
   const sourceElems = responseSources.map((source) => {
     if (source.text) {
-      const nodeText = source.text.length > 150 ? source.text.substring(0, 130) + '...' : source.text;
+      const nodeText = source.text.length > 400 ? source.text.substring(0, 350) + '...' : source.text;
 
       return (
         <SourcesItem>
@@ -265,11 +262,14 @@ const Dashboard: React.FC = () => {
               </SourcesDiv>
             </div>
           </SubContentContainer>
-          <SubContentContainer>
-            <Spacer y={0.5} />
-            <h4>Upload Your Data</h4>
-            {selectedIndexName !== '' ? <DocumentTools index={selectedIndexName}></DocumentTools> : <a>Select an index to insert into</a>}
-          </SubContentContainer>
+
+          {selectedIndexName === 'AI_Tools' || selectedIndexName.startsWith('BigQuery') ? <></> :
+            <SubContentContainer>
+              <Spacer y={0.5} />
+              <h4>Upload Your Data</h4>
+              {selectedIndexName !== '' ? <DocumentTools index={selectedIndexName}></DocumentTools> : <a>Select an index to insert into</a>}
+            </SubContentContainer>
+          }
         </ContentContainer>) : <></>}
 
 

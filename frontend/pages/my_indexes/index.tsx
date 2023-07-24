@@ -9,9 +9,8 @@ import { Button, Spacer } from '@nextui-org/react';
 import { Input } from '@nextui-org/react';
 const cookies = new Cookies();
 const MyIndexes = () => {
-    const [indexes, setIndexes] = useState<{ id: string; name: string; customer_id: string }[]>([]);
+    const [indexes, setIndexes] = useState<{ id: string; name: string; }[]>([]);
     const [newIndexName, setNewIndexName] = useState('');
-    const customerId = cookies.get('customer_id');
     const apiClient = useApiClient();
 
     useEffect(() => {
@@ -19,12 +18,12 @@ const MyIndexes = () => {
     }, []);
 
     const processIndexes = (data: any[]) => {
-        return data.map((index) => ({ id: index.pk, name: index.fields.name, customer_id: index.fields.customer }));
+        return data.map((index) => ({ id: index.pk, name: index.fields.name }));
     };
 
     const fetchIndexes = async () => {
         try {
-            const response = await apiClient.makeRequest('GET', `/llm_integration/indexes/by-user-id/${customerId}/`);
+            const response = await apiClient.makeRequest('GET', `/llm_integration/indexes/by-user-id/`);
             if (response && response.data) {
                 setIndexes(processIndexes(response.data));
             }

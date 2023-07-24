@@ -9,7 +9,7 @@ urlpatterns = [
     path("indexes/create/", views.index_create, name="index_create"),
     path("indexes/delete/<int:pk>/", views.index_delete, name="index_delete"),
     path(
-        "indexes/by-user-id/<int:customer_id>/",
+        "indexes/by-user-id/",
         views.get_indexes_by_user,
         name="indexes_by_user",
     ),

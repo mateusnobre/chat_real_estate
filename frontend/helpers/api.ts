@@ -21,22 +21,11 @@ const useApiClient = () => {
         'Access-Control-Allow-Origin': '*',
       };
       if (cookies.get('access_token') !== undefined) {
-        if (cookies.get('customer_id') !== undefined) {
-          headers = {
-            'content-type': isPOST ? 'multipart/form-data' : 'application/json',
-            'Authorization':
-              ('Bearer ' +
-              cookies.get('access_token')),
-            'Access-Control-Allow-Origin': '*',
-            "customer-id": cookies.get('customer_id'),
-          };
-        } else {
-          headers = {
-            'content-type': isPOST ? 'multipart/form-data' : 'application/json',
-            'Authorization': 'Bearer ' + cookies.get('access_token'),
-            'Access-Control-Allow-Origin': '*',
-          };
-        }
+        headers = {
+          'content-type': isPOST ? 'multipart/form-data' : 'application/json',
+          'Authorization': 'Bearer ' + cookies.get('access_token'),
+          'Access-Control-Allow-Origin': '*',
+        };
       }
       const options: AxiosRequestConfig = {
         method: method,

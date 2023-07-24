@@ -173,10 +173,6 @@ GCLOUD_STORAGE_BUCKET = settings.GCLOUD_STORAGE_BUCKET
 BUCKET = storage.Bucket(STORAGE_CLIENT, GCLOUD_STORAGE_BUCKET)
 CREDENTIALS = service_account.Credentials.from_service_account_file("creds.json")
 
-BIGQUERY_TABLES = [
-            "land_com_final",
-]
-
 LOCK = Lock()
 scoped_credentials = CREDENTIALS.with_scopes(
     ["https://www.googleapis.com/auth/cloud-platform"]
@@ -222,13 +218,13 @@ def query_index(request):
         except Exception as e:
             traceback.print_exc()
             return JsonResponse(status=500)
-
-
     access_token = request.headers.get("Authorization").split(" ")[1]
     token = AccessToken(access_token)
     customer_id = str(token["user_id"])
-
-    index_path = INDEX_PREFIX + "_" + customer_id + "_" + index_name
+    if index_name in ["AI_Tools"]:
+        index_path = index_name
+    else:
+        index_path = INDEX_PREFIX + "_" + customer_id + "_" + index_name
 
     qdrant_vector_store = QdrantVectorStore(
         client=QDRANT_CLIENT, collection_name=index_path
@@ -390,7 +386,7 @@ def upload_file(request):
 @csrf_exempt
 def get_documents(request):
     index_name = request.GET.get("index_name")
-    if index_name.split(" ")[0] == "BigQuery":
+    if index_name.split(" ")[0] == "BigQuery" or index_name in ["AI_Tools"]:
         return HttpResponse([], status=200)
     access_token = request.headers.get("Authorization").split(" ")[1]
     token = AccessToken(access_token)
@@ -489,8 +485,11 @@ def index_delete(request, pk):
 
 
 @csrf_exempt
-def get_indexes_by_user(request, customer_id):
+def get_indexes_by_user(request):
     try:
+        access_token = request.headers.get("Authorization").split(" ")[1]
+        token = AccessToken(access_token)
+        customer_id = str(token["user_id"])
         indexes = Index.objects.filter(customer_id=customer_id)
         data = serializers.serialize("json", indexes)
         return HttpResponse(data, content_type="application/json", status=200)

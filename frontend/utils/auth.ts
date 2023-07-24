@@ -17,7 +17,6 @@ function logout() {
   logger.log('auth.logout');
   cookies.remove('access_token');
   cookies.remove('refresh_token');
-  cookies.remove('customer_id');
 
   // to support logging out from all windows
   window.localStorage.setItem('logout', Date.now().toString());

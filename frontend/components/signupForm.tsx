@@ -42,11 +42,6 @@ const SignupForm = () => {
 
       if (access_token && refresh_token) {
         await handleLogin(access_token, refresh_token);
-
-        const whoAmIResponse = await makeRequest('GET', '/customers/who-am-i/');
-        const customer_id = whoAmIResponse?.data?.customer_id;
-
-        cookies.set('customer_id', customer_id);
         redirect('/dashboard');
       } else {
         logger.log('Signup failed.', email);
