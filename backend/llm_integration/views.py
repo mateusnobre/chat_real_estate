@@ -336,9 +336,6 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
                 uploaded_file_form.save()
             else:
                 print(uploaded_file_form.errors)
-            # Save index and stored docs to their respective locations
-         
-            # Perform the necessary upload operations to the storage location
         # Cleanup temp file
         default_storage.delete(doc_file_path)
     except Exception:
