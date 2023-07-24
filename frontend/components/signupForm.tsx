@@ -2,17 +2,15 @@ import { useState } from 'react';
 import useApiClient from '../helpers/api';
 import logger from '../helpers/logger';
 import { handleLogin } from '../utils/auth';
-import Cookies from 'universal-cookie';
 import { redirect } from '../utils/redirect';
 import styled from 'styled-components';
 import React from 'react';
-import { Button, Input, Spacer } from '@nextui-org/react';
+import { Button, Input, Spacer, Loading } from '@nextui-org/react';
 
-const cookies = new Cookies();
 
 const SignupForm = () => {
   const [email, setEmail] = useState('');
-  const [invitePWD, setInvitePWD] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const [password1, setPassword1] = useState('');
   const [password2, setPassword2] = useState('');
@@ -23,12 +21,15 @@ const SignupForm = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setIsLoading(true)
+
 
     if (password1 !== password2) {
       window.alert('Enter the same password in both fields');
+      setIsLoading(false)
+
       return;
     }
-
     try {
       const response = await makeRequest('post', '/customers/register/', {
         email,
@@ -51,10 +52,8 @@ const SignupForm = () => {
       logger.log('Signup failed.', error);
       setError('An error occurred during signup.');
     }
-  };
+    setIsLoading(false)
 
-  const handleChangeInvite = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setInvitePWD(event.target.value);
   };
 
   const handleChangeEmail = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,14 +75,6 @@ const SignupForm = () => {
   return (
     <form onSubmit={handleSubmit}>
       <SignupFormContainer>
-        {/* <Input
-          type="text"
-          id="invite"
-          name="invite"
-          placeholder="Invite"
-          value={invitePWD}
-          onChange={handleChangeInvite}
-        /> */}
         <Spacer y={0.5} />
         <Input
           type="text"
@@ -121,7 +112,18 @@ const SignupForm = () => {
           onChange={handleChangePassword2}
         />
         <Spacer y={0.5} />
-        <Button type="submit">Sign Up</Button>
+        {
+          isLoading ?
+            <Button disabled type="submit">
+              <Loading type="points" color="currentColor" size="sm" />
+            </Button>
+            : <Button type="submit">
+              <>Sign Up </>
+            </Button>
+        }
+
+
+
         <Error>
           {error && <p>{error}</p>}
         </Error>

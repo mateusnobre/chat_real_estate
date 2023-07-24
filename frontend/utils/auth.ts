@@ -8,7 +8,6 @@ const apiClient = useApiClient();
 
 async function handleLogin(access_token: string, refresh_token: string) {
   logger.log('auth.handleLogin', access_token);
-  localStorage.clear()
   cookies.set('access_token', access_token);
   cookies.set('refresh_token', refresh_token);
 }

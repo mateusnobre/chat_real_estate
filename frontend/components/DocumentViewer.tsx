@@ -71,7 +71,6 @@ const DocumentViewer = ({ documentList, indexName }: DocumentViewerProps) => {
     newArray.unshift(value);
     return newArray;
   };
-  console.log(documentList);
   let documentListElems = documentList.map((document) => {
     // TODO - redo trimming using CSS and text-overflow: ellipsis
     const id =

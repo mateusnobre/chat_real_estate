@@ -1,10 +1,9 @@
 import React from 'react';
 import { ChangeEvent, useState } from 'react';
-import { CircleLoader } from 'react-spinners';
 import styled from 'styled-components';
 import useApiClient from '../helpers/api';
 
-import { Button, Input } from '@nextui-org/react';
+import { Button, Loading } from '@nextui-org/react';
 const Uploader = styled.div`
 
 width: 400px;
@@ -63,10 +62,6 @@ p {
   font-size: 15px;
 
 }
-`
-const UploaderLoader = styled.div`
-align-self: center;
-
 `
 
 interface HTMLInputEvent extends ChangeEvent {
@@ -153,7 +148,12 @@ const DocumentUploader = ({ setRefreshViewer, indexName }: DocumentUploaderProps
           Submit
         </Button>
       )}
-      {isLoading && <UploaderLoader><CircleLoader color='#00f596' /></UploaderLoader>}
+      {
+        isLoading &&
+        <Button disabled type="submit">
+          <Loading type="points" color="currentColor" size="sm" />
+        </Button>
+      }
     </Uploader>
   );
 };

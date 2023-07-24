@@ -3,6 +3,44 @@ import logger from './logger';
 import Cookies from 'universal-cookie';
 
 const cookies = new Cookies();
+let refresh = false;
+
+const getBaseUrl = (): string => {
+  const BASE_URL =
+    process.env.NODE_ENV === 'production'
+      ? 'https://chat-real-estate-backend.onrender.com'
+      : 'http://127.0.0.1:8000';
+  return BASE_URL;
+};
+
+
+axios.interceptors.response.use(resp => resp, async error => {
+    if ((error.response.status === 401 || error.response.status === 500) && !refresh) {
+        refresh = true;
+        let baseUrl = getBaseUrl();
+        let requestUrl = baseUrl + "/customers/token/refresh/";
+        const refreshToken =cookies.get('refresh_token')
+        const response: AxiosResponse = await axios.post(
+          requestUrl, 
+          {"refresh":refreshToken}, 
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          }
+        );
+
+        if (response.status === 200) {
+            axios.defaults.headers.common['Authorization'] = `Bearer ${response.data['access']}`;
+            cookies.set('access_token', response.data.access);
+            cookies.set('refresh_token', response.data.refresh);
+            window.location.reload();
+            return axios(error.config);
+        }
+    }
+    refresh = false;
+    return error;
+});
 
 const useApiClient = () => {
   const makeRequest = async (
@@ -54,17 +92,8 @@ const useApiClient = () => {
     }
   };
 
-  const getBaseUrl = (): string => {
-    const BASE_URL =
-      process.env.NODE_ENV === 'production'
-        ? 'https://chat-real-estate-backend.onrender.com'
-        : 'http://127.0.0.1:8000';
-    return BASE_URL;
-  };
-
   return {
     makeRequest,
-    getBaseUrl,
   };
 };
 

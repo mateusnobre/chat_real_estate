@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import Layout from '../../components/layout';
 import { authCheck } from '../../utils/auth';
 import useApiClient from '../../helpers/api';
-import Cookies from 'universal-cookie';
 import styled from 'styled-components';
 import React from 'react';
-import { Button, Spacer } from '@nextui-org/react';
+import { Button, Loading, Spacer } from '@nextui-org/react';
 import { Input } from '@nextui-org/react';
-const cookies = new Cookies();
+
 const MyIndexes = () => {
     const [indexes, setIndexes] = useState<{ id: string; name: string; }[]>([]);
     const [newIndexName, setNewIndexName] = useState('');
     const apiClient = useApiClient();
+    const [isLoadingCreateIndex, setIsLoadingCreateIndex] = useState(false);
+    const [isLoadingDeleteIndex, setIsLoadingDeleteIndex] = useState(false);
 
     useEffect(() => {
         fetchIndexes();
@@ -33,6 +34,8 @@ const MyIndexes = () => {
     };
 
     const handleCreateIndex = async () => {
+        setIsLoadingCreateIndex(true);
+
         try {
             if (newIndexName === "") {
                 window.alert("Insert a valid data source name")
@@ -47,9 +50,14 @@ const MyIndexes = () => {
         } catch (error) {
             console.error(error);
         }
+        await fetchIndexes();
+        setIsLoadingCreateIndex(false);
+
     };
 
     const handleDeleteIndex = async (indexId: string) => {
+        setIsLoadingDeleteIndex(true);
+
         if (window.confirm('Are you sure you want to delete this agent?')) {
             try {
                 await apiClient.makeRequest('DELETE', `/llm_integration/indexes/delete/${indexId}/`);
@@ -57,7 +65,10 @@ const MyIndexes = () => {
             } catch (error) {
                 console.error(error);
             }
+            await fetchIndexes();
+            setIsLoadingDeleteIndex(false);
         } else {
+            setIsLoadingDeleteIndex(false);
             return;
         }
     };
@@ -90,7 +101,15 @@ const MyIndexes = () => {
                 >
                     <Input type="text" placeholder='Name' value={newIndexName} onChange={(e) => setNewIndexName(e.target.value)} />
                     <Spacer y={0.5} />
-                    <Button auto onClick={handleCreateIndex}>Create</Button>
+                    {
+                        isLoadingCreateIndex ?
+                            <Button disabled >
+                                <Loading type="points" color="currentColor" size="sm" />
+                            </Button>
+                            : <Button auto onClick={handleCreateIndex}>
+                                <>Create </>
+                            </Button>
+                    }
                 </div>
                 <Spacer y={0.5} />
 
@@ -99,7 +118,15 @@ const MyIndexes = () => {
                     <>
                         <IndexItem key={index.id}>
                             <h4>{index.name}</h4>
-                            <Button auto onClick={() => handleDeleteIndex(index.id)}>Delete</Button>
+                            {
+                                isLoadingDeleteIndex ?
+                                    <Button disabled >
+                                        <Loading type="points" color="currentColor" size="sm" />
+                                    </Button>
+                                    : <Button auto onClick={() => handleDeleteIndex(index.id)}>
+                                        <>Delete </>
+                                    </Button>
+                            }
                         </IndexItem>
                         <Spacer y={0.5} />
 

@@ -5,7 +5,7 @@ import useApiClient from '../../helpers/api';
 import styled, { css } from 'styled-components';
 import Cookies from 'universal-cookie';
 import DocumentTools from '../../components/DocumentTools';
-import { Button, Dropdown, Input, Spacer } from '@nextui-org/react';
+import { Button, Dropdown, Input, Loading, Spacer } from '@nextui-org/react';
 
 const DashboardContainer = styled.div`
   display: flex;
@@ -200,12 +200,11 @@ const Dashboard: React.FC = () => {
         'GET',
         `/llm_integration/query-index?text=${queryText}&index_name=${selectedIndexName}`
       );
-      setLoading(false);
       if (response) {
         const data = response.data;
         setResponseText(data.text);
         setResponseSources(data.sources);
-        console.log(data.sources);
+        setLoading(false);
       }
     } catch (error) {
       console.error(error);
@@ -245,7 +244,18 @@ const Dashboard: React.FC = () => {
             <Input css={{ width: "50vw" }} name='queryText' id='queryText' aria-label='queryText' aria-describedby='queryText' required={true} placeholder='Your Question' type="text" value={queryText} onChange={(e) => setQueryText(e.target.value)} />
             <Spacer y={0.5} />
 
-            <Button onClick={handleQuerySubmit}>Submit</Button>
+
+            {
+              isLoading ?
+                <Button css={{ width: "50vw" }} disabled>
+                  <Loading type="points" color="currentColor" size="sm" />
+                </Button>
+                : <Button css={{ width: "50vw" }} onClick={handleQuerySubmit}>
+                  <>Submit Question </>
+                </Button>
+            }
+
+
             <Spacer y={0.5} />
 
             <div>

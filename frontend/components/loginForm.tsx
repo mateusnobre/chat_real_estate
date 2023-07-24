@@ -2,13 +2,10 @@ import { useState, ChangeEvent, FormEvent } from 'react';
 import { handleLogin } from '../utils/auth';
 import logger from '../helpers/logger';
 import useApiClient from '../helpers/api';
-import Cookies from 'universal-cookie';
 import { redirect } from '../utils/redirect';
 import styled from 'styled-components';
 import React from 'react';
-import { Button, Input, Spacer } from '@nextui-org/react';
-
-const cookies = new Cookies();
+import { Button, Input, Loading, Spacer } from '@nextui-org/react';
 
 const LoginContainer = styled.div`
   display: flex;
@@ -36,7 +33,7 @@ const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
+  const [isLoading, setIsLoading] = useState(false);
   const { makeRequest } = useApiClient();
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +48,7 @@ const LoginForm: React.FC = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
+      setIsLoading(true)
       const response = await makeRequest('POST', '/customers/login/', {
         email: email,
         password: password,
@@ -60,6 +58,7 @@ const LoginForm: React.FC = () => {
 
       if (response && access_token && refresh_token) {
         await handleLogin(access_token, refresh_token);
+        setIsLoading(false)
         redirect('/dashboard');
       } else {
         logger.log('Login failed.', email);
@@ -98,9 +97,16 @@ const LoginForm: React.FC = () => {
         />
         <Spacer y={0.5} />
 
-        <Button type="submit">
-          Sign In
-        </Button>
+        {
+          isLoading ?
+            <Button disabled type="submit">
+              <Loading type="points" color="currentColor" size="sm" />
+            </Button>
+            : <Button type="submit">
+              <>Login </>
+            </Button>
+        }
+
 
         <Error>
           <p className={`error ${error && 'show'}`}>{error && `Error: ${error}`}</p>
