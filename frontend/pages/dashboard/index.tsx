@@ -130,7 +130,6 @@ const Dashboard: React.FC = () => {
     { id: '', name: "BigQuery land_com_final" },
     { id: '', name: "BigQuery har_com_for_sale_transformed" },
     { id: '', name: "BigQuery har_com_sold_merge" },
-    { id: '', name: "BigQuery har_com_sold_vacant_empty_land_desc_transformed" },
     { id: '', name: "AI_Tools" },
   ]
 
