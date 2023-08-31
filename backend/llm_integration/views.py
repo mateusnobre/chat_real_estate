@@ -294,7 +294,7 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
     try:
         if kind == "text":
             reader = SimpleDirectoryReader(input_files=[doc_file_path])
-            document = reader.load_data()[0]
+            documents = reader.load_data()
             doc_id = str(doc_file_path).split("/")[-1]
         elif kind == "url":
             if "youtube.com" in doc_file_path.lower():
@@ -325,13 +325,15 @@ def insert_into_index(doc_file_path, index_name, customer_id, kind="text", doc_i
         if doc_file is None:
             # Keep track of stored docs -- llama_index doesn't make this easy
 
-            index.insert(document)
+            for doc in documents:
+                index.insert(doc)
+            
             index.storage_context.persist(
                 persist_dir=f"{GCLOUD_STORAGE_BUCKET}/" + index_path, fs=GCP_FS
             )
 
             index_object = Index.objects.filter(name=index_name, customer=customer_id).first()
-            uploaded_file_form = UploadedFileForm({"name": doc_id, "description": document.text[0:200], "index": index_object.index_id})
+            uploaded_file_form = UploadedFileForm({"name": doc_id, "description": documents[0].text[0:200], "index": index_object.index_id})
             if uploaded_file_form.is_valid():
                 uploaded_file_form.save()
             else:

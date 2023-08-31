@@ -1,10 +1,8 @@
 import { redirect } from './redirect';
 import logger from '../helpers/logger';
 import Cookies from 'universal-cookie';
-import useApiClient from '../helpers/api';
 
 const cookies = new Cookies();
-const apiClient = useApiClient();
 
 async function handleLogin(access_token: string, refresh_token: string) {
   logger.log('auth.handleLogin', access_token);
